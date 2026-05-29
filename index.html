@@ -14946,7 +14946,7 @@ function editCustomLesson(id){
 // 新加年级/Level：往下补即可，不用改其他代码
 const EXAM_BANK = [
   {
-    key:'g1l1', grade:'一年级', level:'Level 1', title:'一年级 上册 识字表',
+    key:'g1l1', grade:'一年级', level:'Level 1', title:'一年级 Level 1 识字表',
     chars:[
       // 识字 1: 天地人
       {c:'天',p:'tiān'},{c:'地',p:'dì'},{c:'人',p:'rén'},
@@ -15016,9 +15016,9 @@ const EXAM_BANK = [
     ]
   },
   // 占位 — 以后补字
-  {key:'g1l2', grade:'一年级', level:'Level 2', title:'一年级 下册 识字表', chars:[]},
-  {key:'g2l1', grade:'二年级', level:'Level 1', title:'二年级 上册 识字表', chars:[]},
-  {key:'g2l2', grade:'二年级', level:'Level 2', title:'二年级 下册 识字表', chars:[]},
+  {key:'g1l2', grade:'一年级', level:'Level 2', title:'一年级 Level 2 识字表', chars:[]},
+  {key:'g2l1', grade:'二年级', level:'Level 1', title:'二年级 Level 1 识字表', chars:[]},
+  {key:'g2l2', grade:'二年级', level:'Level 2', title:'二年级 Level 2 识字表', chars:[]},
   {key:'g3l1', grade:'三年级', level:'Level 1', title:'三年级 Level 1 识字表', chars:[]},
   {key:'g3l2', grade:'三年级', level:'Level 2', title:'三年级 Level 2 识字表', chars:[]},
   {key:'g3l3', grade:'三年级', level:'Level 3', title:'三年级 Level 3 识字表', chars:[]},
@@ -15134,47 +15134,95 @@ function pickExamChars(pack, quizSize, teacherName){
 // ════════════════════════════════════════
 let teacherExamQuizSize = 30;  // 默认 30 字 (老师可选 20/30/50)
 
+let examSelectedModule = null;
+// 教材类型（老师布置识字测验时第一步选择）
+const EXAM_MODULES = [
+  {code:'Z', name:'华语听说读写教材',   en:'Heritage · Listen/Speak/Read/Write',     cvar:'blue'},
+  {code:'H', name:'华语启蒙识字教材',   en:'Heritage · Early Literacy',              cvar:'gold'},
+  {code:'N', name:'非华语听说读写教材', en:'Non-heritage · Listen/Speak/Read/Write', cvar:'green'},
+  {code:'Y', name:'非华语低龄幼儿教材', en:'Non-heritage · Early Years',             cvar:'purple'},
+];
+
 function openTeacherExamLibrary(){
-  // 显示一个 modal，列出所有有字库的 pack，老师选一个 → 弹布置作业 modal
-  if(!document.getElementById('exam-library-modal')){
-    const m = document.createElement('div');
+  examSelectedModule = null;
+  let m = document.getElementById('exam-library-modal');
+  if(!m){
+    m = document.createElement('div');
     m.id = 'exam-library-modal';
     m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:200;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 0;';
-    m.innerHTML = '<div style="background:white;border-radius:16px;padding:24px;max-width:520px;width:92%;box-shadow:0 8px 40px rgba(0,0,0,0.2);margin:auto;">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
-      + '  <div><div style="font-size:18px;font-weight:600;color:var(--ink);">📋 识字测验库</div>'
-      + '  <div style="font-size:12px;color:var(--muted);margin-top:2px;">选一个年级 Level 布置给班级 · 自适应难度</div></div>'
-      + '  <button onclick="document.getElementById(\'exam-library-modal\').style.display=\'none\'" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);">✕</button>'
+    m.innerHTML = '<div style="background:white;border-radius:16px;padding:24px;max-width:560px;width:92%;box-shadow:0 8px 40px rgba(0,0,0,0.2);margin:auto;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:12px;">'
+      + '  <div id="exam-modal-head" style="min-width:0;"></div>'
+      + '  <button onclick="document.getElementById(\'exam-library-modal\').style.display=\'none\'" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);line-height:1;flex-shrink:0;">&#10005;</button>'
       + '</div>'
-      + '<div id="exam-library-list" style="max-height:60vh;overflow-y:auto;"></div>'
+      + '<div id="exam-modal-body" style="max-height:64vh;overflow-y:auto;"></div>'
       + '</div>';
     document.body.appendChild(m);
   }
-  renderTeacherExamList();
-  document.getElementById('exam-library-modal').style.display = 'flex';
+  renderExamModuleSelect();
+  m.style.display = 'flex';
 }
 
-function renderTeacherExamList(){
-  const list = document.getElementById('exam-library-list');
-  if(!list) return;
-  // 分组按年级
-  const grouped = {};
-  EXAM_BANK.forEach(p => {
-    if(!grouped[p.grade]) grouped[p.grade] = [];
-    grouped[p.grade].push(p);
+// 第一步：选择教材类型（Z / H / N / Y）
+function renderExamModuleSelect(){
+  examSelectedModule = null;
+  const head = document.getElementById('exam-modal-head');
+  if(head) head.innerHTML = '<div style="font-size:18px;font-weight:600;color:var(--ink);">📋 识字测验库</div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-top:3px;">先选择教材类型 · Choose a curriculum</div>';
+  const body = document.getElementById('exam-modal-body');
+  if(!body) return;
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(212px,1fr));gap:12px;padding:2px;">';
+  EXAM_MODULES.forEach(function(mod){
+    html += '<div onclick="examModulePick(\'' + mod.code + '\')" '
+      + 'style="background:white;border:1.5px solid var(--border);border-left:5px solid var(--' + mod.cvar + ');border-radius:14px;padding:16px 14px;cursor:pointer;transition:transform .15s,box-shadow .15s;display:flex;align-items:center;gap:13px;" '
+      + 'onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 5px 18px rgba(0,0,0,0.10)\'" '
+      + 'onmouseout="this.style.transform=\'\';this.style.boxShadow=\'\'">'
+      + '<div style="width:50px;height:50px;flex-shrink:0;border-radius:12px;background:var(--' + mod.cvar + '-light);display:flex;align-items:center;justify-content:center;font-family:\'Noto Serif SC\',serif;font-size:28px;font-weight:700;color:var(--' + mod.cvar + ');">' + mod.code + '</div>'
+      + '<div style="min-width:0;"><div style="font-size:14.5px;font-weight:600;color:var(--ink);line-height:1.3;">' + mod.name + '</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-top:3px;line-height:1.3;">' + mod.en + '</div></div>'
+      + '</div>';
   });
+  html += '</div>';
+  body.innerHTML = html;
+}
+
+function examModulePick(code){
+  examSelectedModule = code;
+  renderTeacherExamList(code);
+}
+
+// 第二步：该教材下，按年级 Level 列出识字表
+function renderTeacherExamList(mod){
+  mod = mod || examSelectedModule || 'Z';
+  const modInfo = EXAM_MODULES.find(function(x){ return x.code === mod; }) || {code:mod, name:mod, cvar:'gold'};
+  const head = document.getElementById('exam-modal-head');
+  if(head) head.innerHTML = '<div onclick="renderExamModuleSelect()" style="cursor:pointer;font-size:13px;color:var(--' + modInfo.cvar + ');margin-bottom:5px;display:inline-block;">← 选择其他教材 · Back</div>'
+    + '<div style="font-size:18px;font-weight:600;color:var(--ink);">📋 ' + modInfo.name + '</div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">选一个年级 Level 布置给班级 · 自适应难度</div>';
+  const list = document.getElementById('exam-modal-body');
+  if(!list) return;
+  const packs = EXAM_BANK.filter(function(p){ return (p.module || 'Z') === mod; });
+  if(!packs.length){
+    list.innerHTML = '<div style="text-align:center;padding:44px 16px;color:var(--muted);">'
+      + '<div style="font-size:40px;margin-bottom:10px;">🗂️</div>'
+      + '<div style="font-size:14px;color:var(--ink);font-weight:500;margin-bottom:4px;">该教材识字表正在补全中</div>'
+      + '<div style="font-size:12px;">字库即将上线 · Coming soon</div></div>';
+    return;
+  }
+  const grouped = {};
+  packs.forEach(function(p){ if(!grouped[p.grade]) grouped[p.grade] = []; grouped[p.grade].push(p); });
   let html = '';
-  Object.keys(grouped).forEach(grade => {
-    html += '<div style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin:14px 0 6px;padding-left:4px;">'+grade+'</div>';
+  Object.keys(grouped).forEach(function(grade){
+    html += '<div style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin:14px 0 6px;padding-left:4px;">' + grade + '</div>';
     html += '<div style="display:grid;grid-template-columns:1fr;gap:6px;">';
-    grouped[grade].forEach(p => {
+    grouped[grade].forEach(function(p){
       const empty = p.chars.length === 0;
       const bg = empty ? 'var(--paper2)' : 'white';
       const cursor = empty ? 'default' : 'pointer';
-      const handler = empty ? '' : `onclick="examPickAssign('${p.key}')"`;
-      html += '<div '+handler+' style="background:'+bg+';border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:'+cursor+';display:flex;align-items:center;justify-content:space-between;opacity:'+(empty?'0.5':'1')+';">'
-        + '<div><div style="font-size:14px;font-weight:500;color:var(--ink);">'+p.title+'</div>'
-        + '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+(empty?'⚠️ 字库待补全':p.chars.length+' 个字 · '+p.level)+'</div></div>'
+      const handler = empty ? '' : 'onclick="examPickAssign(\'' + p.key + '\')"';
+      html += '<div ' + handler + ' style="background:' + bg + ';border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:' + cursor + ';display:flex;align-items:center;justify-content:space-between;opacity:' + (empty ? '0.5' : '1') + ';">'
+        + '<div><div style="font-size:14px;font-weight:500;color:var(--ink);">' + p.title + '</div>'
+        + '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + (empty ? '⚠️ 字库待补全' : p.chars.length + ' 个字 · ' + p.level) + '</div></div>'
         + (empty ? '<div style="font-size:11px;color:var(--muted);">待添加</div>' : '<div style="font-size:18px;color:var(--blue);">›</div>')
         + '</div>';
     });
