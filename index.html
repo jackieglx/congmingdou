@@ -7176,6 +7176,10 @@ async function krKaraokeRead(idx) {
 }
 
 async function krReadLine(idx) {
+  // 开始录音前，先停掉"听一听"的范读播放（TTS）和任何正在播的音频，
+  // 否则范读声会被麦克风录进去，干扰识别。
+  try{ window.speechSynthesis.cancel(); }catch(e){}
+  try{ if(typeof stopCurrentAudio==='function') stopCurrentAudio(); }catch(e){}
   const lesson = krCurrentLesson;
   const targetLine = lesson.lines[idx];
   const btn = document.getElementById('kr-read-btn-' + idx);
@@ -7275,7 +7279,7 @@ async function krReadLine(idx) {
       try {
         const blob = new Blob(chunks, {type: mr.mimeType||'audio/webm'});
         const resp = await fetch(
-          'https://api.deepgram.com/v1/listen?language=zh&model=nova-2&punctuate=false&smart_format=false',
+          'https://api.deepgram.com/v1/listen?language=zh-CN&model=nova-3&punctuate=false&smart_format=false',
           {method:'POST', headers:{'Authorization':'Token '+DEEPGRAM_KEY,'Content-Type':blob.type}, body:blob}
         );
         if(resp.ok){
@@ -8049,6 +8053,32 @@ function tcSelectClass(cls){
 function tcBackToClassList(){
   window._tcSelectedClass = null;
   renderTeacherClassCards();
+}
+
+// 渲染班级卡片里的单行作业进度（之前被调用但从未定义，导致有作业的班级点开就崩溃）。
+// expired=true 时为已过期作业，整体置灰。
+function tcHWRow(a, cls, members, expired){
+  const completions = getHWCompletions(a.lessonId, cls);
+  const done = completions.length;
+  const total = Array.isArray(members) ? members.length : 0;
+  const pct = total > 0 ? Math.round(done/total*100) : 0;
+  const barColor = expired ? '#9ca3af' : (pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444');
+  const titleColor = expired ? 'var(--muted)' : 'var(--ink)';
+  const title = (a && a.lessonTitle) ? a.lessonTitle : (a && a.lessonId) || '';
+  const sub = ((a && a.date) || '') + (a && a.deadlineLabel ? ' · ' + a.deadlineLabel : '') + (expired ? ' · 已过期' : '');
+  return '<div style="background:white;border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);' + (expired?'opacity:0.7;':'') + '">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+    + '<div style="flex:1;min-width:0;">'
+    + '<div style="font-size:15px;font-weight:600;color:' + titleColor + ';">《' + title + '》</div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + sub + '</div>'
+    + '</div>'
+    + '<div style="text-align:right;flex-shrink:0;margin-left:10px;">'
+    + '<div style="font-size:22px;font-weight:700;color:' + barColor + ';">' + done + '/' + total + '</div>'
+    + '<div style="font-size:11px;color:' + barColor + ';">' + pct + '% 完成</div>'
+    + '</div></div>'
+    + '<div style="height:6px;background:var(--paper3);border-radius:4px;overflow:hidden;">'
+    + '<div style="width:' + pct + '%;height:100%;background:' + barColor + ';border-radius:4px;transition:width 0.5s;"></div></div>'
+    + '</div>';
 }
 
 // 渲染单班级详细面板（保留原详细 UI 但加返回按钮）
@@ -9044,7 +9074,8 @@ const REWARDS = [
 const DEFAULT_REWARDS = REWARDS.map(r=>({...r}));
 const REWARDS_PER_PAGE = 5;
 let rewardsCurrentPage = 0;
-const SELF_CLASS_KEY = '__self__';
+const SELF_CLASS_KEY = 'self_';  // 占位班级桶（学生未分班时）。不能用 '__self__'：
+                                 // Firebase 禁止字段名以双下划线开头+结尾，会导致积分写入云端失败。
 const POINTS_CLOUD_PATH = 'progress/points';
 
 function defaultPointsData(){
