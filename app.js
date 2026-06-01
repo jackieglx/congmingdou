@@ -12673,31 +12673,9 @@ function renderQuizForLevel(levelKey, mode){
     const doneItems = usableSaved.pages.slice(0, usableSaved.pageIdx).reduce((s,p)=>s+p.items.length, 0) + (usableSaved.itemIdx||0);
     const ago = Math.round((Date.now() - (usableSaved.savedAt||0))/60000);
     const agoText = ago < 1 ? '刚刚' : ago < 60 ? ago+' 分钟前' : Math.round(ago/60)+' 小时前';
-    const choice = confirm(
-      '发现未完成的测验 · Unfinished quiz found\n\n'
-      + '上次进度：第 '+(saved.pageIdx+1)+' 页 · 已答 '+doneItems+'/'+totalItems+' 题\n'
-      + '保存时间：'+agoText+'\n\n'
-      + '点 "确定" 继续上次的进度\n'
-      + '点 "取消" 重新开始'
-    );
-    if(choice){
-      levelQuizSession = {
-        levelKey: usableSaved.levelKey || levelKey,
-        levelLabel: usableSaved.levelLabel || lv.label,
-        pages: usableSaved.pages,
-        pageIdx: usableSaved.pageIdx,
-        itemIdx: usableSaved.itemIdx||0,
-        wrongItems: usableSaved.wrongItems || [],
-        score: usableSaved.score || 0,
-        total: usableSaved.total || 0,
-        paused: false,
-        pageScore: usableSaved.pageScore || 0,
-      };
-      renderLevelQuizPage();
-      return;
-    } else {
-      _clearLevelQuizSession(levelKey);
-    }
+    // 用 app 自定义双语弹窗替代原生 confirm（异步回调：继续→_resumeLevelQuizSession；重新开始→清存档后重入走全新一局）
+    showLevelQuizResumePrompt(levelKey, (usableSaved.pageIdx+1), doneItems, totalItems, agoText);
+    return;
   }
 
   const shuffledWords = shuffleArr(lv.words||[]);
@@ -12750,6 +12728,51 @@ function renderQuizForLevel(levelKey, mode){
   levelQuizSession = {levelKey, levelLabel:lv.label, pages, pageIdx:0, wrongItems:[], score:0, total:0, paused:false, pageScore:0};
   _saveLevelQuizSession();
   renderLevelQuizPage();
+}
+
+// 「继续上次」分支：从存档恢复进度并继续作答（原 confirm 返回 true 时的逻辑）
+function _resumeLevelQuizSession(levelKey){
+  const lv = CT_CHAR_LEVELS.find(l=>l.key===levelKey);
+  const saved = _loadLevelQuizSession(levelKey);
+  if(!lv || !saved || !saved.pages){ return; }
+  levelQuizSession = {
+    levelKey: saved.levelKey || levelKey,
+    levelLabel: saved.levelLabel || lv.label,
+    pages: saved.pages,
+    pageIdx: saved.pageIdx,
+    itemIdx: saved.itemIdx||0,
+    wrongItems: saved.wrongItems || [],
+    score: saved.score || 0,
+    total: saved.total || 0,
+    paused: false,
+    pageScore: saved.pageScore || 0,
+  };
+  renderLevelQuizPage();
+}
+
+// 未完成进度提示弹窗（复用 showExamDueReminder 的居中模态风格 + 配色，双语）
+// 「继续上次」→ _resumeLevelQuizSession；「重新开始」→ 清存档后重入 renderQuizForLevel（无存档→全新一局）
+function showLevelQuizResumePrompt(levelKey, pageNo, doneItems, totalItems, agoText){
+  const old = document.getElementById('lq-resume-overlay');
+  if(old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'lq-resume-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn 0.2s ease;';
+  ov.innerHTML =
+    '<div style="background:white;border-radius:24px;padding:30px 26px;max-width:420px;width:100%;box-shadow:0 12px 48px rgba(0,0,0,0.25);text-align:center;">'
+    + '  <div style="font-size:54px;line-height:1;margin-bottom:8px;">📝</div>'
+    + '  <div style="font-size:20px;font-weight:700;color:var(--blue);margin-bottom:4px;">发现未完成的测验 · Unfinished quiz found</div>'
+    + '  <div style="font-size:13px;color:var(--muted);margin-bottom:18px;">继续上次，或重新开始 · Continue where you left off, or start over</div>'
+    + '  <div style="background:var(--paper2);border-radius:14px;padding:14px 16px;margin-bottom:20px;text-align:left;">'
+    + '    <div style="font-size:13px;color:var(--ink);margin-bottom:6px;">📖 上次进度 · Progress：第 '+pageNo+' 页 · 已答 '+doneItems+' / '+totalItems+' 题</div>'
+    + '    <div style="font-size:12px;color:var(--muted);">⏱ 保存时间 · Saved：'+agoText+'</div>'
+    + '  </div>'
+    + '  <div style="display:flex;gap:10px;flex-wrap:wrap;">'
+    + '    <button onclick="document.getElementById(\'lq-resume-overlay\').remove(); _clearLevelQuizSession(\''+levelKey+'\'); renderQuizForLevel(\''+levelKey+'\')" style="flex:1;min-width:120px;padding:12px 18px;border-radius:14px;border:1px solid var(--border);background:white;color:var(--muted);font-size:15px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;">重新开始 · Restart</button>'
+    + '    <button onclick="document.getElementById(\'lq-resume-overlay\').remove(); _resumeLevelQuizSession(\''+levelKey+'\')" style="flex:1;min-width:120px;padding:12px 18px;border-radius:14px;border:none;background:var(--blue);color:white;font-size:15px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;">继续上次 · Continue</button>'
+    + '  </div>'
+    + '</div>';
+  document.body.appendChild(ov);
 }
 
 function renderL1Quiz(mode){
