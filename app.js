@@ -6868,7 +6868,7 @@ function renderAdminStudents(){
           <div style="font-size:12px;color:var(--muted);">⭐ ${pts}分</div>
         </div>
         <div class="admin-row-actions" style="flex-direction:row;gap:4px;flex-shrink:0;">
-          <button class="admin-btn blue" onclick="openEditUsername('${primaryKey}',${JSON.stringify(u).replace(/'/g,"\\'")})">用户名</button>
+          <button class="admin-btn blue" onclick="openEditUsername('${primaryKey}')">用户名</button>
           <button class="admin-btn blue" onclick="openManageClasses('${primaryKey}','${username}')">班级</button>
           <button class="admin-btn blue" onclick="openEditPts('${primaryKey}','${username}',${pts})">积分</button>
           <button class="admin-btn red" onclick="deleteStudent('${primaryKey}')">删除</button>
@@ -7201,7 +7201,9 @@ function confirmStudentProfile(){
 // ── Admin: edit username ──
 let editingUsernameKey = '';
 
-function openEditUsername(key, u){
+function openEditUsername(key){
+  const u = loadUsers()[key];            // 改为内部按 key 取学生对象（不再从 onclick 传整个对象）
+  if(!u){ alert('学生不存在 · Student not found'); return; }
   editingUsernameKey = key;
   document.getElementById('edit-username-sub').textContent = `当前用户名：${u.username||u.name} · 班级：${u.classCode}`;
   document.getElementById('edit-username-val').value = (u.username||u.name||'').toUpperCase();
