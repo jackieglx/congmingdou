@@ -2235,6 +2235,20 @@ const WORDPIC_BANK = [
   {w:'下',   img:'https://openmoji.org/data/color/svg/2B07.svg'},
   {w:'左',   img:'https://openmoji.org/data/color/svg/2B05.svg'},
   {w:'右',   img:'https://openmoji.org/data/color/svg/27A1.svg'},
+  {w:'风',   img:'https://openmoji.org/data/color/svg/1F32C.svg'},
+  {w:'下雨', img:'https://openmoji.org/data/color/svg/1F327.svg'},
+  {w:'爷爷', img:'https://openmoji.org/data/color/svg/1F474.svg'},
+  {w:'奶奶', img:'https://openmoji.org/data/color/svg/1F475.svg'},
+  {w:'唱歌', img:'https://openmoji.org/data/color/svg/1F3A4.svg'},
+  {w:'家',   img:'https://openmoji.org/data/color/svg/1F3E0.svg'},
+  {w:'看书', img:'https://openmoji.org/data/color/svg/1F4D6.svg'},
+  {w:'飞机', img:'https://openmoji.org/data/color/svg/2708.svg'},
+  {w:'生气', img:'https://openmoji.org/data/color/svg/1F620.svg'},
+  {w:'跑步', img:'https://openmoji.org/data/color/svg/1F3C3.svg'},
+  {w:'牛',   img:'https://openmoji.org/data/color/svg/1F42E.svg'},
+  {w:'羊',   img:'https://openmoji.org/data/color/svg/1F411.svg'},
+  {w:'鸡',   img:'https://openmoji.org/data/color/svg/1F414.svg'},
+  {w:'狼',   img:'https://openmoji.org/data/color/svg/1F43A.svg'},
 ];
 
 const CT_CHAR_LEVELS = [

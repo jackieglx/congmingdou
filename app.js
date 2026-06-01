@@ -2869,7 +2869,7 @@ const WORDPIC_EXCLUSIVE_GROUPS = [
   ['夜晚','月亮'],                 // 都是夜/月，图意太像
   ['下','掉落'],                   // 共用同一张下箭头图
   ['上','下','左','右','掉落'],     // 方向箭头，互相易混
-  ['笑','爸爸','妈妈'],             // 笑脸表情 vs 带笑容的人脸，图意太像
+  ['笑','爸爸','妈妈','爷爷','奶奶'], // 笑脸表情 vs 带笑容的人脸（含爷爷奶奶），图意太像
 ];
 // 两个词是否互斥（同处任一互斥组）
 function wpExclusive(a, b){
@@ -4270,8 +4270,9 @@ function renderTeacherDashboard() {
     + '<div><div style="font-size:20px;font-weight:600;color:white;">' + currentTeacher.name + '</div>'
     + '<div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:3px;">育才中文 教师 · 班级：' + (currentTeacher.classes||[]).join('、') + '</div></div>'
     + '</div>'
-    + '<div style="display:flex;gap:8px;">'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">'
     + '<button onclick="openChangePassword()" style="padding:7px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:white;font-size:12px;cursor:pointer;font-family:\'DM Sans\',sans-serif;">🔒 密码</button>'
+    + '<button onclick="switchTeacherAccount()" style="padding:7px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:white;font-size:12px;cursor:pointer;font-family:\'DM Sans\',sans-serif;">🔄 切换账号 · Switch account</button>'
     + '<button onclick="doTeacherLogout()" style="padding:7px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.4);background:rgba(255,255,255,0.15);color:white;font-size:12px;cursor:pointer;font-family:\'DM Sans\',sans-serif;">退出</button>'
     + '</div></div>';
 
@@ -6700,7 +6701,7 @@ function showReadingTotal(){
 // ════════════════════════════════════════
 // ADMIN PORTAL
 // ════════════════════════════════════════
-const ADMIN_CREDENTIALS = { username:'admin', password:'12345678' };
+const ADMIN_CREDENTIALS = { username:'admin' };   // 明文密码已移除；登录仅走云端验证（保留 username 供云端注册/迁移引用）
 let currentAdmin = null;
 let adminTab = 'students';
 let editingStudentKey = null;
@@ -6712,47 +6713,48 @@ async function doAdminLogin(){
   if(!u){ err.textContent='请输入用户名'; return; }
   if(!p){ err.textContent='请输入密码'; return; }
 
-  // ☁️ 优先走云端
-  if(window.firebaseReady && window.cloudAuth){
-    err.textContent = '☁️ 云端登录中...';
-    try {
-      const result = await window.cloudAuth.loginAdmin(u, p);
-      if(result.ok){
-        err.textContent='';
-        currentAdmin = { username: u, _cloudUid: result.uid, _fromCloud: true };
-        localStorage.setItem('czmd_admin', JSON.stringify(currentAdmin));
-        addRecentAccount({ username: 'admin', name: '管理员', classCode: '__admin__', bg: 'admin' });
-        setCloudSessionStatus(true);
-        await loadSharedCloudCaches();
-        showScreen('admin');
-        renderAdminDashboard();
-        return;
-      } else {
-        console.log('☁️ Admin 云端登录失败:', result.error, '尝试本地登录...');
-      }
-    } catch(e) {
-      console.log('☁️ Admin 云端登录异常:', e.message);
-    }
+  // ☁️ 仅允许云端验证登录——不再有本地明文密码兜底（防止断网时本地登入修改数据、造成与云端不一致）
+  if(!window.firebaseReady || !window.cloudAuth){
+    err.textContent='无法连接服务器，请联网后再登录 · Can\'t reach server, please connect to the internet and log in.';
+    return;
   }
-
-  // ─── 兜底：本地 admin 验证 ───
-  if(u !== ADMIN_CREDENTIALS.username){ err.textContent='用户名错误 · Incorrect username.'; return; }
-  if(p !== ADMIN_CREDENTIALS.password){ err.textContent='密码错误。初始密码 YUCAICHINESE · Incorrect password.'; return; }
-  err.textContent='';
-  currentAdmin = { username: u };
-  localStorage.setItem('czmd_admin', JSON.stringify(currentAdmin));
-  addRecentAccount({ username: 'admin', name: '管理员', classCode: '__admin__', bg: 'admin' });
-  setCloudSessionStatus(false, '管理员');
-  alert('⚠️ 你是本地登录（未连接云端）。\n\n你的改动（布置作业、改积分、管理班级等）可能无法同步到云端，其他设备可能看不到。\n\n建议检查网络后退出重新登录。');
-  showScreen('admin');
-  renderAdminDashboard();
+  err.textContent = '☁️ 云端登录中... · Connecting...';
+  try {
+    const result = await window.cloudAuth.loginAdmin(u, p);
+    if(result.ok){
+      err.textContent='';
+      setPwdFree('admin', 'admin');   // ✅ 仅云端真正验过密码才开 30 天免密
+      currentAdmin = { username: u, _cloudUid: result.uid, _fromCloud: true };
+      localStorage.setItem('czmd_admin', JSON.stringify(currentAdmin));
+      addRecentAccount({ username: 'admin', name: '管理员', classCode: '__admin__', bg: 'admin' });
+      setCloudSessionStatus(true);
+      await loadSharedCloudCaches();
+      showScreen('admin');
+      renderAdminDashboard();
+      return;
+    }
+    // 云端可达但验证失败 → 账号/密码错误；网络类错误归到网络提示
+    if(result.error === 'auth/network-request-failed'){
+      err.textContent='无法连接服务器，请联网后再登录 · Can\'t reach server, please connect to the internet and log in.';
+    } else {
+      err.textContent='用户名或密码错误 · Incorrect username or password.';
+    }
+  } catch(e) {
+    console.log('☁️ Admin 云端登录异常:', e && e.message);
+    err.textContent='无法连接服务器，请联网后再登录 · Can\'t reach server, please connect to the internet and log in.';
+  }
 }
 
 function doAdminLogout(){
+  clearPwdFree('admin', 'admin');   // 主动退出即清免密
   currentAdmin = null;
   localStorage.removeItem('czmd_admin');
   showScreen('auth');
 }
+
+// 切换账号：只回登录页，不清免密（保留 czmd_pwdfree_until_admin_admin 与 czmd_admin），方便点最近登录里的其他账号。
+// 想彻底安全退出请用「退出 · Log out」（doAdminLogout 会清免密）。
+function switchAdminAccount(){ showScreen('auth'); }
 
 function renderAdminDashboard(){
   // User bar
@@ -6763,6 +6765,7 @@ function renderAdminDashboard(){
       <button class="user-bar-btn" onclick="document.getElementById('admin-import-input').click()" style="background:var(--blue);color:white;border-color:var(--blue);">📤 导入数据</button>
       <button class="user-bar-btn" onclick="adminCloudMigrate()" style="background:#7c3aed;color:white;border-color:#7c3aed;">☁️ 学生上云</button>
       <input type="file" id="admin-import-input" accept=".json" style="display:none;" onchange="adminImportData(this)"/>
+      <button class="user-bar-btn" onclick="switchAdminAccount()">🔄 切换账号 · Switch account</button>
       <button class="user-bar-btn" onclick="doAdminLogout()">Log out</button>
     </div>`;
 
@@ -8154,23 +8157,25 @@ const ALL_CLASSES = [
   ...Array.from({length:26}, (_,i)=>`N${i+1}`),
   ...Array.from({length:60}, (_,i)=>`H${i+1}`),
 ];
+// 明文密码已移除：登录仅走云端验证（Firebase）。这里只保留每位老师所教班级（classes），
+// 供班级归属查询 / admin 管理等非登录用途使用；登录时老师的班级以云端 profile.classes 为准。
 const TEACHER_ACCOUNTS = {
-  '黄老师': { password: '888888', classes: ['Z34', 'Z18', 'Z8', 'Z9', 'Z13', 'Z52', 'Z67', 'Z57', 'Z47', 'Z44', 'Z48', 'Z17', 'Z49', 'Z3', 'Z40', 'Z41', 'Z12'] },
-  '白老师': { password: '888888', classes: ['N24', 'Z87', 'Z85', 'Z84', 'N3', 'N32', 'Z15', 'H24', 'Z93', 'Z92', 'Z90'] },
-  '杨艳芝老师': { password: '888888', classes: ['Z19', 'Z31', 'Z61'] },
-  '宫老师': { password: '888888', classes: ['Z37', 'H30', 'H35', 'Z38', 'Z43', 'Z29'] },
-  '赵Melody老师': { password: '888888', classes: ['N21', 'Y4', 'Z80', 'H33', 'H36', 'Y2', 'H20', 'N18', 'Y10', 'Z36', 'Z55'] },
-  '赵雪倩老师': { password: '888888', classes: ['Z32', 'Z62', 'Z10', 'Z65'] },
-  '魏老师': { password: '888888', classes: ['Z89', 'Z51', 'Z96', 'H56', 'N19', 'Y8', 'H50', 'Z91'] },
-  '陈老师': { password: '888888', classes: ['N13'] },
-  '孙老师': { password: '888888', classes: ['N5'] },
-  '杨旭佳老师': { password: '888888', classes: ['Z39', 'Z95', 'Z94', 'Z54'] },
-  '蒋老师': { password: '888888', classes: ['H22', 'N15', 'Y9', 'H49', 'H48', 'H46', 'Y7', 'N10', 'N8', 'Z58', 'Z50', 'H26'] },
-  '马老师': { password: '888888', classes: ['Z88', 'Z82', 'H21', 'Z20', 'Z4', 'Z11', 'Z60', 'H42', 'Z53', 'Z69'] },
-  '王老师': { password: '888888', classes: ['Z6', 'Z72'] },
-  '庞老师': { password: '888888', classes: ['Z35', 'Z63', 'Z66'] },
-  '张皓老师': { password: '888888', classes: ['H39', 'Z33', 'Z27', 'Z64', 'Z46', 'Z14', 'Z16', 'Z21', 'Z23', 'Z5'] },
-  '张颖涛老师': { password: '888888', classes: ['Z2', 'Z24', 'Z75', 'Z30', 'Z25', 'Z26'] },
+  '黄老师': { classes: ['Z34', 'Z18', 'Z8', 'Z9', 'Z13', 'Z52', 'Z67', 'Z57', 'Z47', 'Z44', 'Z48', 'Z17', 'Z49', 'Z3', 'Z40', 'Z41', 'Z12'] },
+  '白老师': { classes: ['N24', 'Z87', 'Z85', 'Z84', 'N3', 'N32', 'Z15', 'H24', 'Z93', 'Z92', 'Z90'] },
+  '杨艳芝老师': { classes: ['Z19', 'Z31', 'Z61'] },
+  '宫老师': { classes: ['Z37', 'H30', 'H35', 'Z38', 'Z43', 'Z29'] },
+  '赵Melody老师': { classes: ['N21', 'Y4', 'Z80', 'H33', 'H36', 'Y2', 'H20', 'N18', 'Y10', 'Z36', 'Z55'] },
+  '赵雪倩老师': { classes: ['Z32', 'Z62', 'Z10', 'Z65'] },
+  '魏老师': { classes: ['Z89', 'Z51', 'Z96', 'H56', 'N19', 'Y8', 'H50', 'Z91'] },
+  '陈老师': { classes: ['N13'] },
+  '孙老师': { classes: ['N5'] },
+  '杨旭佳老师': { classes: ['Z39', 'Z95', 'Z94', 'Z54'] },
+  '蒋老师': { classes: ['H22', 'N15', 'Y9', 'H49', 'H48', 'H46', 'Y7', 'N10', 'N8', 'Z58', 'Z50', 'H26'] },
+  '马老师': { classes: ['Z88', 'Z82', 'H21', 'Z20', 'Z4', 'Z11', 'Z60', 'H42', 'Z53', 'Z69'] },
+  '王老师': { classes: ['Z6', 'Z72'] },
+  '庞老师': { classes: ['Z35', 'Z63', 'Z66'] },
+  '张皓老师': { classes: ['H39', 'Z33', 'Z27', 'Z64', 'Z46', 'Z14', 'Z16', 'Z21', 'Z23', 'Z5'] },
+  '张颖涛老师': { classes: ['Z2', 'Z24', 'Z75', 'Z30', 'Z25', 'Z26'] },
 };
 let currentTeacher = null;
 let teacherSelectedClass = 'Z34';
@@ -8184,50 +8189,42 @@ async function doTeacherLogin(){
   if(!name){ err.textContent='请输入姓名 Please enter your name.'; return; }
   if(!pwd){  err.textContent='请输入密码 Please enter password.'; return; }
 
-  // ☁️ 优先走云端登录
-  if(window.firebaseReady && window.cloudAuth){
-    err.textContent = '☁️ 云端登录中...';
-    try {
-      const result = await window.cloudAuth.loginTeacher(name, pwd);
-      if(result.ok){
-        err.textContent = '';
-        currentTeacher = {
-          name: result.profile.name || name,
-          classes: result.profile.classes || [],
-          _cloudUid: result.uid,
-          _fromCloud: true
-        };
-        localStorage.setItem('czmd_teacher', JSON.stringify(currentTeacher));
-        teacherSelectedClass = currentTeacher.classes[0] || '';
-        addRecentAccount({ username: name, name: name, classCode: '__teacher__', bg: 'teacher' });
-        setCloudSessionStatus(true);
-        await loadSharedCloudCaches();
-        showScreen('teacher');
-        renderTeacherDashboard();
-        return;
-      } else {
-        console.log('☁️ 老师云端登录失败:', result.error, '尝试本地登录...');
-      }
-    } catch(e) {
-      console.log('☁️ 云端登录异常:', e.message);
-    }
-  }
-
-  // ─── 兜底：本地登录 ───
-  const acct = TEACHER_ACCOUNTS[name];
-  if(!acct || acct.password !== pwd){
-    err.textContent='姓名或密码错误。初始密码 YUCAICHINESE · Incorrect.';
+  // ☁️ 仅允许云端验证登录——不再有本地明文密码兜底（防止断网时本地登入修改数据、造成与云端不一致）
+  if(!window.firebaseReady || !window.cloudAuth){
+    err.textContent='无法连接服务器，请联网后再登录 · Can\'t reach server, please connect to the internet and log in.';
     return;
   }
-  err.textContent='';
-  currentTeacher = { name, classes: acct.classes };
-  localStorage.setItem('czmd_teacher', JSON.stringify(currentTeacher));
-  teacherSelectedClass = acct.classes[0];
-  addRecentAccount({ username: name, name: name, classCode: '__teacher__', bg: 'teacher' });
-  setCloudSessionStatus(false, '老师');
-  alert('⚠️ 你是本地登录（未连接云端）。\n\n你布置的作业/识字测验可能无法同步到云端，学生和其他设备可能看不到。\n\n建议检查网络后退出重新登录。');
-  showScreen('teacher');
-  renderTeacherDashboard();
+  err.textContent = '☁️ 云端登录中... · Connecting...';
+  try {
+    const result = await window.cloudAuth.loginTeacher(name, pwd);
+    if(result.ok){
+      err.textContent = '';
+      setPwdFree('teacher', name);   // ✅ 仅云端真正验过密码才开 30 天免密
+      currentTeacher = {
+        name: result.profile.name || name,
+        classes: result.profile.classes || [],
+        _cloudUid: result.uid,
+        _fromCloud: true
+      };
+      localStorage.setItem('czmd_teacher', JSON.stringify(currentTeacher));
+      teacherSelectedClass = currentTeacher.classes[0] || '';
+      addRecentAccount({ username: name, name: name, classCode: '__teacher__', bg: 'teacher' });
+      setCloudSessionStatus(true);
+      await loadSharedCloudCaches();
+      showScreen('teacher');
+      renderTeacherDashboard();
+      return;
+    }
+    // 云端可达但验证失败 → 姓名/密码错误；网络类错误归到网络提示
+    if(result.error === 'auth/network-request-failed'){
+      err.textContent='无法连接服务器，请联网后再登录 · Can\'t reach server, please connect to the internet and log in.';
+    } else {
+      err.textContent='姓名或密码错误 · Incorrect name or password.';
+    }
+  } catch(e) {
+    console.log('☁️ 老师云端登录异常:', e && e.message);
+    err.textContent='无法连接服务器，请联网后再登录 · Can\'t reach server, please connect to the internet and log in.';
+  }
 }
 
 function switchTeacherTab(tab){
@@ -8261,8 +8258,9 @@ function renderTeacherDashboard(){
     + '    <div style="font-size:11px;color:var(--muted);margin-top:2px;">教师 · Teacher · '+(currentTeacher.classes||[]).length+' 个班级</div>'
     + '  </div>'
     + '</div>'
-    + '<div style="display:flex;gap:6px;flex-shrink:0;">'
+    + '<div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;">'
     + '  <button class="user-bar-btn" onclick="openChangePassword()" style="padding:6px 12px;font-size:12px;">🔒 密码</button>'
+    + '  <button class="user-bar-btn" onclick="switchTeacherAccount()" style="padding:6px 12px;font-size:12px;">🔄 切换账号 · Switch account</button>'
     + '  <button class="user-bar-btn" onclick="doTeacherLogout()" style="padding:6px 12px;font-size:12px;">退出</button>'
     + '</div>'
     + '</div>';
@@ -8595,10 +8593,15 @@ function confirmChangePassword(){
 }
 
 function doTeacherLogout(){
+  if(currentTeacher && currentTeacher.name) clearPwdFree('teacher', currentTeacher.name);   // 主动退出即清免密
   currentTeacher=null;
   localStorage.removeItem('czmd_teacher');
   showScreen('auth');
 }
+
+// 切换账号：只回登录页，不清免密（保留 czmd_pwdfree_until_teacher_<name> 与 czmd_teacher），方便点最近登录里的其他账号。
+// 想彻底安全退出请用「退出 · Log out」（doTeacherLogout 会清免密）。
+function switchTeacherAccount(){ showScreen('auth'); }
 
 function getAssignedHW(){ return safeParseJSON(localStorage.getItem('czmd_homework'), []); }
 function saveAssignedHW(list){
@@ -9695,6 +9698,14 @@ function seedStudentAccounts(){
 const RECENT_KEY = 'czmd_recent_accounts';
 const MAX_RECENT = 5;
 
+// ── 老师/admin 免密有效期（仅「云端验密成功」才开启；本设备、30 天内、未登出才生效）──
+// key: czmd_pwdfree_until_teacher_<name> / czmd_pwdfree_until_admin_admin，值为到期时间戳(ms)
+const PWDFREE_MS = 30 * 24 * 60 * 60 * 1000;   // 30 天
+function pwdFreeKey(role, name){ return 'czmd_pwdfree_until_' + role + '_' + name; }
+function setPwdFree(role, name){ try{ localStorage.setItem(pwdFreeKey(role, name), String(Date.now() + PWDFREE_MS)); }catch(e){} }
+function isPwdFree(role, name){ const v = parseInt(localStorage.getItem(pwdFreeKey(role, name)) || '0', 10); return v > Date.now(); }
+function clearPwdFree(role, name){ try{ localStorage.removeItem(pwdFreeKey(role, name)); }catch(e){} }
+
 function getRecentAccounts(){
   try{ return JSON.parse(localStorage.getItem(RECENT_KEY)||'[]'); }catch(e){ return []; }
 }
@@ -9727,12 +9738,33 @@ function removeRecentAccount(username, classCode){
 function quickLogin(username, classCode){
   // Handle special roles
   if(classCode === '__admin__'){
+    // 免密：云端验过密码 + 30 天内未过期 + 未主动登出 → 直接进，不要求输密码
+    const savedA = safeParseJSON(localStorage.getItem('czmd_admin'), null);
+    if(savedA && isPwdFree('admin', 'admin')){
+      currentAdmin = savedA;
+      setCloudSessionStatus(true);
+      showScreen('admin');
+      renderAdminDashboard();
+      if(typeof loadSharedCloudCaches === 'function') loadSharedCloudCaches().then(function(){ if(document.getElementById('screen-admin') && document.getElementById('screen-admin').classList.contains('active')) renderAdminDashboard(); });
+      return;
+    }
     switchAuthTab('admin');
     document.getElementById('admin-username').value = 'admin';
     document.getElementById('admin-username').focus();
     return;
   }
   if(classCode === '__teacher__'){
+    // 免密：云端验过密码 + 30 天内未过期 + 未主动登出 + 持久会话就是这个老师 → 直接进
+    const savedT = safeParseJSON(localStorage.getItem('czmd_teacher'), null);
+    if(savedT && savedT.name === username && isPwdFree('teacher', username)){
+      currentTeacher = savedT;
+      teacherSelectedClass = (savedT.classes && savedT.classes[0]) || '';
+      setCloudSessionStatus(true);
+      showScreen('teacher');
+      renderTeacherDashboard();
+      if(typeof loadSharedCloudCaches === 'function') loadSharedCloudCaches().then(function(){ if(document.getElementById('screen-teacher') && document.getElementById('screen-teacher').classList.contains('active')) renderTeacherDashboard(); });
+      return;
+    }
     switchAuthTab('teacher');
     document.getElementById('teacher-name').value = username;
     document.getElementById('teacher-pwd').value = '';
