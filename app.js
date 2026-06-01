@@ -11796,7 +11796,7 @@ function examRender(){
   // 顶部信息
   let html = '<div style="text-align:center;padding:8px 0 16px;">'
     + '<div style="font-family:serif;font-size:20px;color:var(--ink);margin-bottom:4px;">'+st.pack.title+'</div>'
-    + '<div style="font-size:12px;color:var(--muted);">📋 听音选字 · 每题随机出 8 个字</div>'
+    + '<div style="font-size:12px;color:var(--muted);">📋 听音选字 · 每题随机出 8 个字<br><span style="font-size:11px;">Listen &amp; Pick · 8 random characters per question</span></div>'
     + '</div>';
 
   // ★ 恢复进度提示 + 重新开始入口（仅在本场是从存档恢复时显示）
@@ -11809,9 +11809,9 @@ function examRender(){
 
   // 进度卡片
   html += '<div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px;flex-wrap:wrap;">'
-    + '<span class="exam-progress-pill" style="background:var(--gold-light);color:var(--gold);">⭐ 已答对 '+passed+' / '+totalChars+'</span>'
-    + '<span class="exam-progress-pill" style="background:var(--blue-light);color:var(--blue);">📝 第 '+st.questionNum+' 题</span>'
-    + '<span class="exam-progress-pill" style="background:var(--red-light);color:var(--red);">❗ 待答 '+remaining+'</span>'
+    + '<span class="exam-progress-pill" style="background:var(--gold-light);color:var(--gold);">⭐ 已答对 '+passed+' / '+totalChars+' · Correct</span>'
+    + '<span class="exam-progress-pill" style="background:var(--blue-light);color:var(--blue);">📝 第 '+st.questionNum+' 题 · Question</span>'
+    + '<span class="exam-progress-pill" style="background:var(--red-light);color:var(--red);">❗ 待答 '+remaining+' · Remaining</span>'
     + '</div>';
 
   // ─── 大方块容器：包住播放按钮 + 字块网格 ───
@@ -11819,9 +11819,9 @@ function examRender(){
 
   // 播放区
   html += '<div style="text-align:center;margin-bottom:18px;">'
-    + '<div id="exam-cur-label" style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">听一听</div>'
+    + '<div id="exam-cur-label" style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">听一听 · Listen</div>'
     + '<button class="exam-play-btn" id="exam-play-btn" onclick="examReplay()">'
-    + '  <span style="font-size:20px;">🔊</span><span id="exam-play-text">播放</span>'
+    + '  <span style="font-size:20px;">🔊</span><span id="exam-play-text">播放 · Play</span>'
     + '</button>'
     + '</div>';
 
@@ -11849,11 +11849,11 @@ function examPlayCurrent(){
   const btn = document.getElementById('exam-play-btn');
   const txt = document.getElementById('exam-play-text');
   if(btn) btn.classList.add('playing');
-  if(txt) txt.textContent = '播放中…';
+  if(txt) txt.textContent = '播放中… · Playing';
   if(typeof speakChinese === 'function'){
     speakChinese(st.currentChar.c, ()=>{
       if(btn) btn.classList.remove('playing');
-      if(txt) txt.textContent = '再听一次';
+      if(txt) txt.textContent = '再听一次 · Listen again';
     });
   }
 }
