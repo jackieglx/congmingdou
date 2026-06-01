@@ -6915,9 +6915,13 @@ function deleteStudent(key){
 
 // ── Manage Classes Modal ──
 let mcmStudentKey='';
+let mcmOriginalClasses=[];   // 打开弹窗时的班级快照，供「取消」回滚
 
 function openManageClasses(key, name){
   mcmStudentKey=key;
+  // 快照打开前的班级（增删即时生效，「取消」据此回滚到打开前的状态）
+  try{ const _u=loadUsers()[key]; mcmOriginalClasses = _u ? getStudentClasses(_u).slice() : []; }
+  catch(e){ mcmOriginalClasses=[]; }
   document.getElementById('mcm-title').textContent='管理班级 · '+name;
   document.getElementById('mcm-sub').textContent='可添加多个班级，学生作业显示所有班级的作业';
   document.getElementById('mcm-add-input').value='';
@@ -6979,6 +6983,21 @@ function mcmRemoveClass(cls){
   saveUsers(users);
   renderMCMClasses();
   renderAdminStudents();
+}
+
+// 「取消」：回滚到打开弹窗前的班级快照（放弃本次所有增删），然后关闭弹窗。
+// 走 saveUsers 写回——若云端写入失败，cloudWriteRef 会触发 notifyCloudWriteFailed（不静默）。
+function mcmCancelChanges(){
+  const users=loadUsers();
+  const u=users[mcmStudentKey];
+  if(u){
+    const restored=(mcmOriginalClasses||[]).slice();
+    u.classes=restored;
+    u.classCode=restored[0]||'';
+    saveUsers(users);
+    if(typeof renderAdminStudents==='function') renderAdminStudents();
+  }
+  closeAdminModal('manage-classes-modal');
 }
 
 // ── Class Management ──

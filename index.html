@@ -1398,14 +1398,25 @@
     <div class="section-label" style="margin-bottom:8px;">当前班级 · Current Classes</div>
     <div id="mcm-current-classes" style="margin-bottom:16px;"></div>
     <div class="section-label" style="margin-bottom:8px;">添加班级 · Add to Class</div>
-    <div style="display:flex;gap:8px;margin-bottom:8px;">
-      <input class="auth-input" id="mcm-add-input" placeholder="输入班级编号 e.g. Z2" style="flex:1;"/>
-      <button class="auth-btn" style="background:var(--blue);" onclick="mcmAddClass()">+ 添加</button>
+    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:stretch;">
+      <input class="auth-input" id="mcm-add-input" placeholder="输入班级编号 e.g. Z2" style="flex:1;min-width:0;"/>
+      <button class="auth-btn" style="background:var(--blue);flex:0 0 auto;width:auto;padding:11px 16px;white-space:nowrap;" onclick="mcmAddClass()">+ 添加</button>
     </div>
     <div class="auth-err" id="mcm-err" style="margin-bottom:8px;"></div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">或从列表选择 · Or pick from list</div>
-    <div id="mcm-class-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;max-height:160px;overflow-y:auto;margin-bottom:16px;"></div>
-    <button class="auth-btn" style="width:100%;background:var(--paper2);color:var(--ink);" onclick="closeAdminModal('manage-classes-modal')">完成 · Done</button>
+    <style>
+      /* 作用域仅限本弹窗：补回班级小方块基础样式（全局 .assign-cls-tile 基础规则缺失/损坏），让列表整齐、首行不贴边被切 */
+      #manage-classes-modal #mcm-class-grid .assign-cls-tile{
+        padding:7px 4px;border:1px solid var(--border);border-radius:8px;
+        background:var(--paper2);color:var(--muted);font-size:12px;font-weight:500;
+        text-align:center;cursor:pointer;transition:all 0.12s;
+      }
+    </style>
+    <div id="mcm-class-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;max-height:200px;overflow-y:auto;margin-bottom:16px;padding:8px;border:1px solid var(--border);border-radius:10px;"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="auth-btn" style="flex:1;background:var(--paper2);color:var(--ink);" onclick="mcmCancelChanges()">取消 · Cancel</button>
+      <button class="auth-btn" style="flex:1;background:var(--blue);" onclick="closeAdminModal('manage-classes-modal')">完成 · Done</button>
+    </div>
   </div>
 </div>
 
