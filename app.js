@@ -1808,7 +1808,7 @@ function renderUserBar(containerId){
       <span class="user-bar-class"> · ${currentUser.classCode}</span>
     </div>
     <div class="user-bar-actions">
-      <button class="user-bar-btn" onclick="openStudentProfile()">✏️ 个人资料</button>
+      <button class="user-bar-btn" onclick="openStudentProfile()">✏️ 个人资料 · Profile</button>
       <button class="user-bar-btn" onclick="doLogout()">Log out</button>
     </div>`;
 }
@@ -1958,6 +1958,14 @@ function renderLevelMap(){
 function openMiniModule(type){
   showScreen('module-'+type);
   if(type==='writing') initWritingModule();
+  if(type==='literacy'){
+    // 看字选图卡片标签：动态显示题库总数 + 每轮题数（总数随 WORDPIC_BANK 自动更新）
+    const el = document.getElementById('wordpic-stat-label');
+    if(el && typeof WORDPIC_BANK !== 'undefined'){
+      el.textContent = WORDPIC_BANK.length + '个词·每轮' + WP_ROUND_SIZE + '题 · '
+                     + WORDPIC_BANK.length + ' words · ' + WP_ROUND_SIZE + ' per round';
+    }
+  }
 }
 
 // ════════════════════════════════════════
@@ -2048,6 +2056,15 @@ function renderWritingPractice(){
       <div style="font-size:12px;color:var(--blue);background:var(--blue-light);padding:4px 10px;border-radius:10px;">${ch.strokes}笔</div>
     </div>
 
+    <!-- 练习进度（醒目）：3 遍点亮指示 + 双语回合 + 规则强调 -->
+    <div style="background:var(--blue-light);border:1.5px solid #cce0f5;border-radius:14px;padding:12px 14px;margin-bottom:14px;text-align:center;">
+      <div style="display:flex;justify-content:center;align-items:center;gap:14px;margin-bottom:8px;" id="w-practice-dots">
+        ${[0,1,2].map(i=>`<div id="w-dot-${i}" style="width:20px;height:20px;border-radius:50%;transition:all 0.2s;background:${i<wPracticeCount?'var(--green)':'#cdd8e8'};border:2px solid ${i<wPracticeCount?'var(--green)':'#b6c6df'};box-shadow:${i<wPracticeCount?'0 2px 6px rgba(45,106,79,0.35)':'none'};"></div>`).join('')}
+      </div>
+      <div id="w-round-label" style="font-size:15px;font-weight:700;color:var(--blue);">第 ${Math.min(wPracticeCount+1,3)} 遍 / 共 3 遍 · Round ${Math.min(wPracticeCount+1,3)} of 3</div>
+      <div style="font-size:11px;color:var(--ink);margin-top:4px;line-height:1.4;"><strong style="color:var(--red);">同一个字要写满 3 遍</strong>才能进入下一个字<br><span style="font-size:10px;color:var(--muted);">Write the character 3 times to move on</span></div>
+    </div>
+
     <div style="display:flex;gap:14px;justify-content:center;align-items:flex-start;margin-bottom:14px;flex-wrap:wrap;">
 
       <!-- 左：笔顺动画（Hanzi Writer） -->
@@ -2083,12 +2100,6 @@ function renderWritingPractice(){
     </div>
 
     <div id="w-feedback" style="min-height:36px;text-align:center;"></div>
-
-    <!-- 练习次数进度 -->
-    <div style="display:flex;justify-content:center;gap:8px;margin-top:10px;" id="w-practice-dots">
-      ${[0,1,2].map(i=>`<div style="width:10px;height:10px;border-radius:50%;background:${i<wPracticeCount?'var(--green)':'var(--border)'};" id="w-dot-${i}"></div>`).join('')}
-    </div>
-    <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:4px;">练习 ${wPracticeCount}/3 次 · Practice ${wPracticeCount}/3 times</div>
   `;
 
   // 左侧：循环播放笔顺动画
@@ -2170,18 +2181,20 @@ function wOnQuizComplete(summary){
     const dot=document.getElementById('w-dot-'+i);
     if(dot) dot.style.background=i<wPracticeCount?'var(--green)':'var(--border)';
   }
-  const cntEl=document.getElementById('w-practice-dots');
-  if(cntEl && cntEl.nextElementSibling) cntEl.nextElementSibling.textContent='练习 '+wPracticeCount+'/3 次 · Practice '+wPracticeCount+'/3 times';
+  const labelEl=document.getElementById('w-round-label');
+  if(labelEl){ const r=Math.min(wPracticeCount+1,3); labelEl.textContent='第 '+r+' 遍 / 共 3 遍 · Round '+r+' of 3'; }
 
   if(typeof playCorrect==='function') playCorrect();
   const fb=document.getElementById('w-feedback');
 
   if(wPracticeCount>=3){
-    if(fb) fb.innerHTML='<div style="color:var(--green);font-size:15px;font-weight:600;">🎉 这个字写完啦！</div>';
-    setTimeout(wShowComplete, 800);
+    // 刚满 3 遍：明确祝贺 + 提示去下一字（保留原有进入下一字逻辑，稍延时让提示看清，不突然）
+    if(fb) fb.innerHTML='<div style="color:var(--green);font-size:15px;font-weight:600;">🎉 太棒了！这个字写好啦，去下一个字 · Great! Next character!</div>';
+    setTimeout(wShowComplete, 1100);
   } else {
-    const msg = mistakes===0 ? '🌟 完美！一笔没错，再写一遍' : '👍 写完一遍！再来一遍';
-    if(fb) fb.innerHTML='<div style="color:var(--green);font-size:15px;font-weight:600;">'+msg+'</div>';
+    // 还没满 3 遍：告诉他这一遍记下了、还差几遍
+    const remain = 3 - wPracticeCount;
+    if(fb) fb.innerHTML='<div style="color:var(--green);font-size:15px;font-weight:600;">写得好！再写 '+remain+' 遍就过关啦 · '+remain+' more to go!</div>';
     const ch = WRITING_CHARS[wCurrentIdx];
     setTimeout(function(){ if(ch) wStartQuizRound(ch.char); }, 1200);
   }
@@ -2324,14 +2337,15 @@ function wSubmitPractice(){
     const dot=document.getElementById('w-dot-'+i);
     if(dot) dot.style.background=i<wPracticeCount?'var(--green)':'var(--border)';
   }
-  const cntEl=document.getElementById('w-practice-dots');
-  if(cntEl) cntEl.nextElementSibling.textContent='练习 '+wPracticeCount+'/3 次 · Practice '+wPracticeCount+'/3 times';
+  const labelEl=document.getElementById('w-round-label');
+  if(labelEl){ const r=Math.min(wPracticeCount+1,3); labelEl.textContent='第 '+r+' 遍 / 共 3 遍 · Round '+r+' of 3'; }
 
   if(wPracticeCount>=3){
-    setTimeout(wShowComplete,500);
+    fb.innerHTML='<div style="color:var(--green);font-size:15px;font-weight:600;">🎉 太棒了！这个字写好啦，去下一个字 · Great! Next character!</div>';
+    setTimeout(wShowComplete,1100);
   } else {
-    const msg = score>=70 ? '🌟 写得很好！再写一次' : '👍 继续练习！再写一次';
-    fb.innerHTML='<div style="color:var(--green);font-size:15px;font-weight:600;">'+msg+'</div>';
+    const remain = 3 - wPracticeCount;
+    fb.innerHTML='<div style="color:var(--green);font-size:15px;font-weight:600;">写得好！再写 '+remain+' 遍就过关啦 · '+remain+' more to go!</div>';
     playCorrect();
     setTimeout(wClearCanvas,800);
   }
@@ -2605,6 +2619,7 @@ let mgRound = 0;
 let mgBasket = [];
 let mgBunnyPos = {x:0, y:0};
 let mgAnimating = false;
+let mgWrong = 0;   // 当前目标字已点错次数（每个新目标字归零；达 3 次揭晓答案）
 
 function startMushroomGame(){
   mgScore = 0;
@@ -2623,6 +2638,7 @@ function exitMushroomGame(){
 function mgNewRound(){
   mgRound++;
   mgAnimating = false;
+  mgWrong = 0;
   // Pick 12 random unique chars
   const pool = shuffle([...COMMON_CHARS_200]).slice(0, 12);
   mgTargetIdx = Math.floor(Math.random() * 12);
@@ -2648,34 +2664,48 @@ function renderMushroomGame(){
       .mg-mushroom:hover { transform:scale(1.05); border-color:#2e7d32; }
       .mg-mushroom .mg-char { font-family:'Noto Serif SC',serif; font-size:38px; font-weight:700; color:#1b5e20; line-height:1; }
       .mg-mushroom .mg-icon { font-size:32px; display:block; margin-bottom:6px; }
+      .mg-replay { max-width:100%; }
+      /* 窄屏：缩小双语 UI 文字，确保标题/分数/提示/按钮不溢出、不错位（不影响蘑菇格子题目汉字） */
+      @media(max-width:560px){
+        .mg-title { font-size:15px; }
+        .mg-score { font-size:16px; }
+        .mg-instr { font-size:11px; }
+        .mg-replay { font-size:13px; padding:8px 16px; }
+      }
     </style>
 
     <!-- Header bar -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
       <div>
-        <div style="font-family:serif;font-size:18px;color:#2e7d32;">采蘑菇 🍄</div>
-        <div style="font-size:11px;color:var(--muted);">第 ${mgRound} 轮</div>
+        <div class="mg-title" style="font-family:serif;font-size:18px;color:#2e7d32;">采蘑菇 · Pick Mushrooms 🍄</div>
+        <div style="font-size:11px;color:var(--muted);">第 ${mgRound} 轮 · Round ${mgRound}</div>
       </div>
       <div style="background:#e8f5e9;border:2px solid #81c784;border-radius:16px;padding:6px 14px;text-align:center;">
-        <div style="font-size:20px;font-weight:700;color:#2e7d32;">${mgScore} 分</div>
+        <div class="mg-score" style="font-size:20px;font-weight:700;color:#2e7d32;">${mgScore} 分 · pts</div>
       </div>
     </div>
 
     <!-- Bunny + instruction area -->
-    <div style="background:linear-gradient(135deg,#f1f8e9,#dcedc8);border-radius:18px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:14px;position:relative;overflow:hidden;">
-      <!-- Basket & bunny (positioned) -->
-      <div id="mg-bunny-area" style="position:relative;width:64px;height:64px;flex-shrink:0;">
-        <div style="font-size:48px;line-height:1;" id="mg-bunny-el">🐰</div>
+    <div style="background:linear-gradient(135deg,#f1f8e9,#dcedc8);border-radius:18px;padding:14px 16px;margin-bottom:14px;position:relative;overflow:hidden;">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <!-- Basket & bunny (positioned) -->
+        <div id="mg-bunny-area" style="position:relative;width:64px;height:64px;flex-shrink:0;">
+          <div style="font-size:48px;line-height:1;" id="mg-bunny-el">🐰</div>
+        </div>
+        <div style="flex:1;text-align:center;">
+          <div class="mg-instr" style="font-size:12px;color:#33691e;margin-bottom:8px;font-weight:500;">听到这个字，找到它！<br><span style="font-size:10px;color:#558b2f;font-weight:400;">Listen and find the character!</span></div>
+          <button onclick="speakMushroomTarget()" class="mg-replay" style="background:#2e7d32;color:white;border:none;border-radius:20px;padding:9px 22px;font-size:15px;cursor:pointer;font-family:DM Sans,sans-serif;">🔊 再听一次 · Replay</button>
+        </div>
+        <div style="text-align:center;flex-shrink:0;">
+          <div style="font-size:40px;">🧺</div>
+          <div style="font-size:18px;min-width:36px;">${mgBasket.slice(-2).join('')}</div>
+          <div style="font-size:10px;color:#388e3c;">${mgBasket.length} 个 · picked</div>
+        </div>
       </div>
-      <div style="flex:1;text-align:center;">
-        <div style="font-size:12px;color:#33691e;margin-bottom:8px;font-weight:500;">听到这个字，找到它！</div>
-        <button onclick="speakMushroomTarget()" style="background:#2e7d32;color:white;border:none;border-radius:20px;padding:9px 22px;font-size:15px;cursor:pointer;font-family:DM Sans,sans-serif;">🔊 再听一次</button>
-      </div>
-      <div style="text-align:center;flex-shrink:0;">
-        <div style="font-size:40px;">🧺</div>
-        <div style="font-size:18px;min-width:36px;">${mgBasket.slice(-2).join('')}</div>
-        <div style="font-size:10px;color:#388e3c;">${mgBasket.length}个</div>
-      </div>
+      <!-- 揭晓提示（点错 3 次后显示） -->
+      <div id="mg-reveal-hint" style="display:none;text-align:center;margin-top:10px;font-size:13px;font-weight:600;color:#2e7d32;">这个字在这里哦！· Here it is! 🐰</div>
+      <!-- 规则小字提示（中英双语，温和） -->
+      <div class="mg-rule" style="text-align:center;margin-top:8px;font-size:10px;color:#7cb342;line-height:1.35;">试 3 次还没找到，就会告诉你答案哦<br><span style="opacity:0.85;">Try 3 times — if you can't find it, we'll show you the answer</span></div>
     </div>
 
     <!-- Mushroom grid: 4x3 -->
@@ -2762,14 +2792,46 @@ function mgPickMushroom(idx){
     }, 700);
 
   } else {
-    // Wrong — shake the cell
+    // Wrong — 记错字本（复用现有 addWrongChar，去重由它内部处理；拼音用 krGetPinyin 安全取，取不到留空）
+    if(typeof addWrongChar === 'function'){
+      addWrongChar(picked, (typeof krGetPinyin==='function'?krGetPinyin(picked):''), '', '采蘑菇', '');
+    }
+    mgWrong++;
     cell.style.animation='mg-wrong 0.3s ease';
     playWrong();
-    setTimeout(()=>{
-      cell.style.animation='';
-      // Move bunny back and replay audio
-      setTimeout(()=> speakMushroomTarget(), 200);
-    }, 350);
+
+    if(mgWrong >= 3){
+      // 点错累计 3 次 → 揭晓答案（不加分！），高亮正确蘑菇并温和提示，短暂停留后进入下一字
+      mgAnimating = true;
+      // 把"没找到的目标字本身"也记入错字本（这才是学生真正不认识的字）
+      if(typeof addWrongChar === 'function'){
+        addWrongChar(mgTargetChar, (typeof krGetPinyin==='function'?krGetPinyin(mgTargetChar):''), '', '采蘑菇', '');
+      }
+      const target = document.getElementById('mg-'+mgTargetIdx);
+      if(target){
+        target.style.animation='mg-celebrate 0.5s ease';
+        target.style.background='#c8e6c9';
+        target.style.borderColor='#2e7d32';
+        // 仅替换图标层，保留题目汉字不动
+        const icon = target.querySelector('.mg-icon');
+        if(icon) icon.textContent='👉';
+      }
+      const bunny = document.getElementById('mg-bunny-el');
+      if(bunny){ bunny.textContent='🐰'; }
+      mgMoveBunnyTo('cell', mgTargetIdx);
+      const reveal = document.getElementById('mg-reveal-hint');
+      if(reveal) reveal.style.display='block';
+      setTimeout(()=>{
+        mgMoveBunnyTo('home');
+        mgNewRound();
+      }, 1800);
+    } else {
+      setTimeout(()=>{
+        cell.style.animation='';
+        // Move bunny back and replay audio
+        setTimeout(()=> speakMushroomTarget(), 200);
+      }, 350);
+    }
   }
 }
 
@@ -2786,6 +2848,200 @@ function mgSkip(){
   s.textContent='@keyframes mg-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}';
   document.head.appendChild(s);
 })();
+
+// ════════════════════════════════════════
+// 看字选图 · WORD TO PICTURE GAME
+// ════════════════════════════════════════
+// 题库 WORDPIC_BANK 在 data.js（{w, img}）。本版只用本局临时分，不接全局积分。
+const WP_ROUND_SIZE = 10;   // 每局题数
+const WP_MAX_WRONG  = 3;    // 单题最多点错几次（用尽则公布答案）
+
+let wpQuestions = [];
+let wpIdx = 0;
+let wpScore = 0;
+let wpWrong = 0;
+let wpAnswered = false;
+let wpCorrectIdx = -1;
+
+// 看字选图 · 互斥组：同一组内的词不能互相作为对方的干扰项（图意太像 / 同图，易混淆）。
+// 维护：以后要加新规则，往数组里再加一行 [...] 即可。
+const WORDPIC_EXCLUSIVE_GROUPS = [
+  ['夜晚','月亮'],                 // 都是夜/月，图意太像
+  ['下','掉落'],                   // 共用同一张下箭头图
+  ['上','下','左','右','掉落'],     // 方向箭头，互相易混
+];
+// 两个词是否互斥（同处任一互斥组）
+function wpExclusive(a, b){
+  return WORDPIC_EXCLUSIVE_GROUPS.some(g => g.includes(a) && g.includes(b));
+}
+
+function startWordPicGame(){
+  wpQuestions = shuffle([...WORDPIC_BANK]).slice(0, Math.min(WP_ROUND_SIZE, WORDPIC_BANK.length));
+  wpIdx = 0;
+  wpScore = 0;
+  showScreen('wordpic');
+  renderWordPicQuestion();
+}
+
+function exitWordPicGame(){
+  showScreen('module-literacy');
+}
+
+// 图片加载失败时显示浅色占位，避免布局崩
+function wpImgError(img){
+  img.onerror = null;
+  img.style.display = 'none';
+  const ph = img.parentElement.querySelector('.wp-img-ph');
+  if(ph) ph.style.display = 'flex';
+}
+
+function renderWordPicQuestion(){
+  const q = wpQuestions[wpIdx];
+  wpAnswered = false;
+  wpWrong = 0;
+
+  // 选项 = 1 正确 + 2 干扰，位置打乱
+  // ★ 干扰项不仅要词不同，图也必须不同（有的词共用同一张图，如「下」和「掉落」都用下箭头），
+  //   否则同一题会出现两张一样的图、无法作答。这里按 img 去重，保证三张图互不相同。
+  const usedImgs = new Set([q.img]);
+  const distractors = [];
+  for(const cand of shuffle(WORDPIC_BANK.filter(x => x.w !== q.w))){
+    if(usedImgs.has(cand.img)) continue;                              // 三张图必须互不相同
+    if(wpExclusive(cand.w, q.w)) continue;                           // 不与正确答案同处互斥组
+    if(distractors.some(d => wpExclusive(cand.w, d.w))) continue;    // 也不与已选干扰项互斥
+    usedImgs.add(cand.img);
+    distractors.push(cand);
+    if(distractors.length === 2) break;
+  }
+  const options = shuffle([q, ...distractors]);
+  wpCorrectIdx = options.findIndex(o => o.w === q.w);
+
+  const container = document.getElementById('wordpic-container');
+  container.innerHTML = `
+    <style>
+      /* 字号写在类里（非内联），窄屏 @media 才能覆盖，确保双语 UI 不溢出/错位 */
+      .wp-title { font-family:serif; font-size:18px; color:var(--blue); }
+      .wp-qnum  { font-size:11px; color:var(--muted); }
+      .wp-score { font-size:20px; font-weight:700; color:var(--blue); }
+      .wp-ask   { font-size:12px; color:#1976d2; margin-bottom:10px; font-weight:500; }
+      .wp-ask-en{ font-size:10px; color:#1565c0; font-weight:400; }
+      @media(max-width:560px){
+        .wp-title { font-size:15px; }
+        .wp-qnum  { font-size:10px; }
+        .wp-score { font-size:16px; }
+        .wp-ask   { font-size:11px; }
+      }
+    </style>
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;">
+      <div>
+        <div class="wp-title">看字选图 · Word to Picture 🖼️</div>
+        <div class="wp-qnum">第 ${wpIdx+1} / ${wpQuestions.length} 题 · Question ${wpIdx+1} / ${wpQuestions.length}</div>
+      </div>
+      <div style="background:var(--blue-light);border:2px solid var(--blue);border-radius:16px;padding:6px 14px;text-align:center;flex-shrink:0;">
+        <div class="wp-score">${wpScore} 分 · pts</div>
+      </div>
+    </div>
+
+    <!-- 题面词 -->
+    <div style="background:linear-gradient(135deg,#e3f2fd,#bbdefb);border:2px solid #64b5f6;border-radius:20px;padding:24px 16px;margin-bottom:8px;text-align:center;">
+      <div class="wp-ask">这个词是哪张图？<br><span class="wp-ask-en">Which picture matches this word?</span></div>
+      <div style="font-family:'Noto Serif SC',serif;font-size:48px;font-weight:700;color:#1565c0;line-height:1;">${q.w}</div>
+    </div>
+
+    <!-- 提示行 -->
+    <div id="wp-hint" style="text-align:center;font-size:12px;color:var(--muted);min-height:18px;margin-bottom:12px;">选出正确的图片 · Pick the correct picture</div>
+
+    <!-- 选项 -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
+      ${options.map((o, idx)=>`
+        <div class="wp-option" id="wp-opt-${idx}" onclick="wpPick(${idx})"
+          style="background:white;border:2.5px solid #90caf9;border-radius:18px;padding:12px 8px;cursor:pointer;text-align:center;transition:transform 0.15s,border-color 0.15s;box-shadow:var(--shadow);"
+          onmouseover="if(!this.dataset.done)this.style.transform='translateY(-3px)'" onmouseout="this.style.transform=''">
+          <div style="position:relative;width:100%;height:96px;display:flex;align-items:center;justify-content:center;">
+            <img src="${o.img}" alt="" style="width:96px;height:96px;object-fit:contain;" onerror="wpImgError(this)">
+            <div class="wp-img-ph" style="display:none;width:96px;height:96px;border-radius:12px;background:var(--blue-light);align-items:center;justify-content:center;font-size:32px;">🖼️</div>
+          </div>
+        </div>`).join('')}
+    </div>
+
+    <!-- 下一题按钮（答完才出现） -->
+    <div id="wp-next-wrap" style="text-align:center;display:none;">
+      <button onclick="wpNext()" class="auth-btn" style="display:inline-block;width:auto;padding:10px 28px;">下一题 · Next →</button>
+    </div>
+  `;
+}
+
+function wpPick(idx){
+  if(wpAnswered) return;
+  const opt = document.getElementById('wp-opt-'+idx);
+  if(!opt) return;
+  const hint = document.getElementById('wp-hint');
+
+  if(idx === wpCorrectIdx){
+    // 点对 → +1 分、标记正确、禁用本题、显示下一题
+    wpAnswered = true;
+    opt.dataset.done = '1';
+    opt.style.borderColor = 'var(--green)';
+    opt.style.background = 'var(--green-light)';
+    wpScore += 1;
+    playCorrect();
+    if(hint){ hint.textContent = '答对了！ +1 分 · Correct! +1 🎉'; hint.style.color = 'var(--green)'; }
+    wpShowNext();
+  } else {
+    // 点错 → 该选项标灰失效，提示还能试几次
+    opt.dataset.done = '1';
+    opt.style.pointerEvents = 'none';
+    opt.style.opacity = '0.4';
+    opt.style.borderColor = 'var(--border)';
+    wpWrong++;
+    playWrong();
+    if(wpWrong >= WP_MAX_WRONG){
+      // 点错累计达上限 → 自动高亮正确答案并告诉学生，允许进入下一题
+      wpAnswered = true;
+      const correct = document.getElementById('wp-opt-'+wpCorrectIdx);
+      if(correct){ correct.style.borderColor = 'var(--green)'; correct.style.background = 'var(--green-light)'; }
+      if(hint){ hint.textContent = '正确答案是这张图（' + wpQuestions[wpIdx].w + '）· Correct answer'; hint.style.color = 'var(--blue)'; }
+      wpShowNext();
+    } else {
+      const left = WP_MAX_WRONG - wpWrong;
+      if(hint){ hint.textContent = '不对哦，还能试 ' + left + ' 次 · Try again (' + left + ' left)'; hint.style.color = '#c0392b'; }
+    }
+  }
+}
+
+function wpShowNext(){
+  const wrap = document.getElementById('wp-next-wrap');
+  if(wrap) wrap.style.display = 'block';
+}
+
+function wpNext(){
+  wpIdx++;
+  if(wpIdx >= wpQuestions.length){
+    wpShowResult();
+  } else {
+    renderWordPicQuestion();
+  }
+}
+
+function wpShowResult(){
+  const container = document.getElementById('wordpic-container');
+  const total = wpQuestions.length;
+  const pct = total ? Math.round(wpScore / total * 100) : 0;
+  container.innerHTML = `
+    <div style="background:white;border:2px solid #64b5f6;border-radius:20px;padding:36px 24px;text-align:center;box-shadow:var(--shadow);margin-top:20px;">
+      <div style="font-size:56px;margin-bottom:12px;">${pct>=80?'🏆':pct>=50?'🎉':'💪'}</div>
+      <div style="font-family:serif;font-size:22px;color:var(--blue);margin-bottom:8px;">本局结束！· All done!</div>
+      <div style="font-size:16px;color:var(--ink);margin-bottom:6px;">答对 <strong>${wpScore}</strong> / ${total} 题 · ${wpScore}/${total} correct</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:24px;">看字选对图 · Word to Picture</div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <button class="auth-btn" onclick="startWordPicGame()" style="display:inline-block;width:auto;padding:10px 24px;">🔄 再玩一次 · Play again</button>
+        <button class="auth-btn" onclick="exitWordPicGame()" style="display:inline-block;width:auto;padding:10px 24px;background:var(--paper2);color:var(--ink);">← 返回 · Back</button>
+      </div>
+    </div>
+  `;
+}
 
 // ════════════════════════════════════════
 // 朗读练习 · READING PRACTICE (课文版)
@@ -3741,10 +3997,10 @@ function renderWrongChars(){
     : fullList.filter(w => (w.sources||[]).includes(filter));
 
   const totalErrors = list.reduce((s,w)=>s+(w.count||1),0);
-  let html = '<div style="background:white;border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:16px;box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:center;">'
-    + '<div><div style="font-size:26px;font-weight:700;color:var(--red);">' + list.length + '</div><div style="font-size:12px;color:var(--muted);">待复习的字</div></div>'
-    + '<div style="text-align:center;"><div style="font-size:26px;font-weight:700;color:var(--gold);">' + totalErrors + '</div><div style="font-size:12px;color:var(--muted);">累计错误次数</div></div>'
-    + '<button onclick="wcPracticeAll()" style="padding:10px 16px;border-radius:var(--radius);border:none;background:var(--red);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif;">📝 专项练习</button>'
+  let html = '<div style="background:white;border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:16px;box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px 12px;">'
+    + '<div><div style="font-size:26px;font-weight:700;color:var(--red);">' + list.length + '</div><div style="font-size:12px;color:var(--muted);">待复习的字 · To review</div></div>'
+    + '<div style="text-align:center;"><div style="font-size:26px;font-weight:700;color:var(--gold);">' + totalErrors + '</div><div style="font-size:12px;color:var(--muted);">累计错误次数 · Total errors</div></div>'
+    + '<button onclick="wcPracticeAll()" style="padding:10px 16px;border-radius:var(--radius);border:none;background:var(--red);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:\'DM Sans\',sans-serif;">📝 专项练习 · Practice</button>'
     + '</div>';
 
   // 来源筛选行（≥ 2 个不同来源才显示）
@@ -3761,10 +4017,26 @@ function renderWrongChars(){
             : 'background:white;color:var(--muted);border:1.5px solid var(--border);')
         + '">' + label + '</button>';
     };
-    html += filterPill('all', '全部 ('+fullList.length+')');
+    // 来源 → 英文名：复用各游戏/功能在别处已有的英文叫法，不另起新译名（数字/键值不变，只译显示文字）
+    const srcEN = (s) => {
+      if(s==='全部') return 'All';
+      if(s.indexOf('识字测验')>=0) return 'Character Quiz';
+      if(s.indexOf('日常自测')>=0) return 'Daily Quiz';
+      if(s==='朗读练习') return 'Reading Practice';
+      if(s==='听读练习') return 'Listen & Record';
+      if(s==='采蘑菇')   return 'Pick Mushrooms';
+      if(s==='听音选字') return 'Listen & Pick';
+      if(s==='翻卡片')   return 'Flashcard';
+      if(s==='选择题')   return 'Multiple Choice';
+      if(s==='拼写' || s==='拼写练习') return 'Type It';
+      if(s==='练习' || s==='复习练习') return 'Review Drill';
+      return '';   // 未知来源：不强行翻译，保留原文
+    };
+    const srcLabel = (s) => { const en = srcEN(s); return en ? (s + ' · ' + en) : s; };
+    html += filterPill('all', srcLabel('全部')+' ('+fullList.length+')');
     Array.from(allSources).sort().forEach(s => {
       const count = fullList.filter(w => (w.sources||[]).includes(s)).length;
-      html += filterPill(s, s+' ('+count+')');
+      html += filterPill(s, srcLabel(s)+' ('+count+')');
     });
     html += '</div></div>';
   }

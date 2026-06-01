@@ -539,13 +539,13 @@
       </div>
     </div>
 
-    <!-- Game 2: Picture Match (Coming Soon) -->
-    <div style="background:linear-gradient(135deg,#e3f2fd,#bbdefb);border:2px solid #64b5f6;border-radius:20px;padding:20px 24px;display:flex;align-items:center;gap:20px;opacity:0.7;">
+    <!-- Game 2: Picture Match -->
+    <div onclick="startWordPicGame()" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb);border:2px solid #64b5f6;border-radius:20px;padding:20px 24px;cursor:pointer;display:flex;align-items:center;gap:20px;transition:all 0.2s;box-shadow:var(--shadow);" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform=''">
       <div style="font-size:56px;flex-shrink:0;">🖼️</div>
       <div>
         <div style="font-family:serif;font-size:20px;color:#1565c0;margin-bottom:4px;">看字选图 · Word to Picture</div>
         <div style="font-size:13px;color:#1976d2;">看到汉字，选出对应的图片<br>See the character, pick the matching picture!</div>
-        <div style="margin-top:8px;"><span style="font-size:11px;background:#90caf9;color:#0d47a1;padding:2px 8px;border-radius:10px;font-weight:500;">🚧 即将上线 · Coming Soon</span></div>
+        <div style="margin-top:8px;"><span id="wordpic-stat-label" style="font-size:11px;background:#90caf9;color:#0d47a1;padding:2px 8px;border-radius:10px;font-weight:500;">看字选对图</span></div>
       </div>
     </div>
 
@@ -570,6 +570,12 @@
 <div id="screen-mushroom" class="screen">
   <button class="btn-home" onclick="exitMushroomGame()">← 返回 · Back</button>
   <div id="mushroom-game-container"></div>
+</div>
+
+<!-- WORD TO PICTURE GAME SCREEN -->
+<div id="screen-wordpic" class="screen">
+  <button class="btn-home" onclick="exitWordPicGame()">← 返回 · Back</button>
+  <div id="wordpic-container"></div>
 </div>
 
 <!-- LEARNING VIDEOS SCREEN -->
@@ -827,7 +833,7 @@
   <div class="home-header" style="padding:10px 0 16px;">
     <span style="font-size:36px;">📕</span>
     <div style="font-family:serif;font-size:22px;color:var(--ink);margin-top:6px;">错字复习</div>
-    <div style="font-size:12px;color:var(--muted);">My Mistake Bank · 自动收录练习中答错的字</div>
+    <div style="font-size:12px;color:var(--muted);">My Mistake Bank · 自动收录练习中答错的字 · Auto-saved from practice</div>
   </div>
   <div id="wc-content"></div>
 </div>

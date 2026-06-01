@@ -755,6 +755,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   .pinyin-builder-wrap{flex-direction:column;}
   .pinyin-panel{width:100%;max-height:none;}
   .lesson-grid{grid-template-columns:1fr;}
+  /* 窄屏：用户栏放不下时，操作按钮（个人资料·Profile / Log out）整组优雅换到第二行并靠右，避免溢出/截断 */
+  .user-bar{flex-wrap:wrap;row-gap:8px;}
+  .user-bar-info{min-width:0;}
+  .user-bar-actions{margin-left:auto;}
 }
 
 .recent-acct-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--paper2);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all 0.15s;margin-bottom:8px;}
