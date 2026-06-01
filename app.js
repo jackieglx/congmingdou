@@ -4517,8 +4517,11 @@ function tcCheckClassFromBtn(btn) {
   switchTeacherHWTab('check');
   renderTeacherCheckPanel();
 }
+// 切换批改表的班级筛选：班级码纯字母数字，按钮用单引号传入（不再在 onclick 里塞 JSON.stringify）；
+// 点击后重渲染整个面板，刷新「选中高亮」+ 表格内容。
 function tcSetCheckClass(cls) {
   tcCheckClass = cls;
+  renderTeacherCheckPanel();
 }
 
 function renderTeacherCheckPanel() {
@@ -4528,7 +4531,7 @@ function renderTeacherCheckPanel() {
   // Class filter buttons
   const filterEl = document.getElementById('tp-check-class-filter');
   if(filterEl) filterEl.innerHTML = classes.map(cls =>
-    '<button onclick="tcCheckClass=' + JSON.stringify(cls) + ';tcCheckClass=JSON.parse(tcCheckClass);renderTeacherCheckTable()" '
+    '<button onclick="tcSetCheckClass(\'' + cls + '\')" '
     + 'style="padding:7px 16px;border-radius:20px;border:2px solid ' + (cls===tcCheckClass?'var(--blue)':'var(--border)') + ';'
     + 'background:' + (cls===tcCheckClass?'var(--blue)':'white') + ';'
     + 'color:' + (cls===tcCheckClass?'white':'var(--muted)') + ';'
@@ -10926,32 +10929,6 @@ function renderLessonTabContent(n) {
 
 function closeEditTabModal(){ const m=document.getElementById('edit-tab-modal'); if(m) m.remove(); }
 
-function buildEditTabModalHTML(lessonId, n, MODES, tabData) {
-  const tabNames = ['','一','二','三','四'];
-  const itemsHtml = (tabData.items||[]).filter(i=>i.type==='mode').map(item => {
-    const lbl = (MODES.find(m=>m.key===item.mode)||{label:item.mode}).label;
-    return '<div data-mode="'+item.mode+'" style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--paper2);border-radius:8px;margin-bottom:6px;">'
-      + '<span style="flex:1;font-size:13px;">'+lbl+'</span>'
-      + '<button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:18px;">×</button>'
-      + '</div>';
-  }).join('');
-
-  const modeButtons = MODES.map(m =>
-    '<button data-mode-key="'+m.key+'" onclick="addModeToTab(this.dataset.modeKey,'+JSON.stringify(lessonId)+','+n+')" '
-    + 'style="padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--paper2);font-size:12px;cursor:pointer;text-align:left;font-family:DM Sans,sans-serif;">'
-    + m.label+'</button>'
-  ).join('');
-
-  return '<div id="edit-tab-modal" style="background:white;border-radius:20px;padding:24px;width:100%;max-width:380px;max-height:85vh;overflow-y:auto;">'
-    + '<div style="font-size:16px;font-weight:600;margin-bottom:16px;">编辑第'+tabNames[n]+'份作业</div>'
-    + '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">添加练习模式：</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px;">'+modeButtons+'</div>'
-    + '<div id="modal-tab-items" style="margin-bottom:16px;">'+itemsHtml+'</div>'
-    + '<div style="display:flex;gap:8px;">'
-    + '<button onclick="closeEditTabModal()" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--paper2);cursor:pointer;font-family:DM Sans,sans-serif;">取消</button>'
-    + '<button onclick="saveLessonTabFromModal('+JSON.stringify(lessonId)+','+n+',this)" style="flex:1;padding:10px;border-radius:10px;border:none;background:var(--blue);color:white;cursor:pointer;font-family:DM Sans,sans-serif;font-weight:600;">保存</button>'
-    + '</div></div>';
-}
 
 
 function editLessonTab(n) {
@@ -10999,7 +10976,7 @@ function editLessonTab(n) {
     + '<div id="modal-tab-items" style="margin-bottom:16px;min-height:40px;">'+itemsHtml+'</div>'
     + '<div style="display:flex;gap:8px;">'
     + '<button onclick="renderLessonTabContent('+n+')" style="flex:1;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--paper2);cursor:pointer;font-family:DM Sans,sans-serif;font-size:13px;">取消</button>'
-    + '<button onclick="saveLessonTabFromModal('+JSON.stringify(lesson.id)+','+n+',this)" style="flex:1;padding:11px;border-radius:10px;border:none;background:var(--blue);color:white;cursor:pointer;font-family:DM Sans,sans-serif;font-weight:600;font-size:13px;">💾 保存</button>'
+    + '<button id="lesson-tab-save-btn" style="flex:1;padding:11px;border-radius:10px;border:none;background:var(--blue);color:white;cursor:pointer;font-family:DM Sans,sans-serif;font-weight:600;font-size:13px;">💾 保存</button>'
     + '</div></div>';
 
   // Attach click handlers to mode buttons
@@ -11008,6 +10985,9 @@ function editLessonTab(n) {
     btn.onmouseover = function(){ this.style.background='var(--blue-light)'; };
     btn.onmouseout = function(){ this.style.background='var(--paper2)'; };
   });
+  // 保存按钮也用 JS 绑定（lesson.id 走闭包，避免在 onclick 属性里塞 JSON.stringify）
+  const saveBtn = contentEl.querySelector('#lesson-tab-save-btn');
+  if(saveBtn) saveBtn.onclick = function(){ saveLessonTabFromModal(lesson.id, n, this); };
 }
 
 function addModeToTab(modeKey, lessonId, n) {
