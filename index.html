@@ -1399,7 +1399,7 @@
     <div id="mcm-current-classes" style="margin-bottom:16px;"></div>
     <div class="section-label" style="margin-bottom:8px;">添加班级 · Add to Class</div>
     <div style="display:flex;gap:8px;margin-bottom:8px;align-items:stretch;">
-      <input class="auth-input" id="mcm-add-input" placeholder="输入班级编号 e.g. Z2" style="flex:1;min-width:0;"/>
+      <input class="auth-input" id="mcm-add-input" placeholder="输入班级编号 e.g. Z2" style="flex:1;min-width:0;" oninput="mcmRenderClassGrid(this.value)"/>
       <button class="auth-btn" style="background:var(--blue);flex:0 0 auto;width:auto;padding:11px 16px;white-space:nowrap;" onclick="mcmAddClass()">+ 添加</button>
     </div>
     <div class="auth-err" id="mcm-err" style="margin-bottom:8px;"></div>

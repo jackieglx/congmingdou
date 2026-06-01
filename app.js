@@ -6930,11 +6930,24 @@ function openManageClasses(key, name){
   document.getElementById('mcm-add-input').value='';
   document.getElementById('mcm-err').textContent='';
   renderMCMClasses();
-  // Build class grid Z1-Z99
-  document.getElementById('mcm-class-grid').innerHTML=ALL_CLASSES.map(c=>`
+  mcmRenderClassGrid('');   // 列表初始显示全部班级
+  document.getElementById('manage-classes-modal').style.display='flex';
+}
+
+// 「或从列表选择」班级列表渲染 + 实时筛选（纯前端在 ALL_CLASSES 里按班级码包含匹配，不分大小写）
+// filter 为空 → 显示全部；无匹配 → 友好提示。不影响「+ 添加」按钮。
+function mcmRenderClassGrid(filter){
+  const grid = document.getElementById('mcm-class-grid');
+  if(!grid) return;
+  const q = (filter||'').trim().toUpperCase();
+  const list = q ? ALL_CLASSES.filter(c => String(c).toUpperCase().includes(q)) : ALL_CLASSES;
+  if(!list.length){
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px;padding:10px 0;">没有匹配的班级 · No matching class</div>';
+    return;
+  }
+  grid.innerHTML = list.map(c=>`
     <div class="assign-cls-tile" onclick="mcmQuickAdd('${c}')" title="${c}">${c}</div>
   `).join('');
-  document.getElementById('manage-classes-modal').style.display='flex';
 }
 
 function renderMCMClasses(){
