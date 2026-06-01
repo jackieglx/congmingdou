@@ -2014,22 +2014,47 @@ function wReplayHanziDemo(){
 let wCurrentIdx=0, wCanvas=null, wCtx=null;
 let wDrawing=false, wUserPath=[], wPracticeCount=0;
 
-function initWritingModule(){ wCurrentIdx=0; renderWritingHome(); }
+const WRITING_PER_PAGE = 20;   // 每页字数：按此自动分页（以后加第三页只需往 WRITING_CHARS 末尾继续加字）
+let wHomePage = 0;             // 写字练习首页当前页码（0 起）
+
+function wTotalWritingPages(){ return Math.max(1, Math.ceil(WRITING_CHARS.length / WRITING_PER_PAGE)); }
+function wGoHomePage(p){
+  const total = wTotalWritingPages();
+  wHomePage = Math.min(Math.max(0, p), total - 1);
+  renderWritingHome();
+}
+
+function initWritingModule(){ wCurrentIdx=0; wHomePage=0; renderWritingHome(); }
 
 function renderWritingHome(){
+  const total = wTotalWritingPages();
+  if(wHomePage > total - 1) wHomePage = total - 1;
+  if(wHomePage < 0) wHomePage = 0;
+  const start = wHomePage * WRITING_PER_PAGE;
+  const pageChars = WRITING_CHARS.slice(start, start + WRITING_PER_PAGE);
+  const prevBtn = '<button class="auth-btn" onclick="wGoHomePage('+(wHomePage-1)+')" style="display:inline-block;width:auto;padding:10px 18px;background:var(--paper2);color:var(--ink);">← 上一页 · Previous</button>';
+  const nextBtn = '<button class="auth-btn" onclick="wGoHomePage('+(wHomePage+1)+')" style="display:inline-block;width:auto;padding:10px 18px;background:var(--blue);">下一页 · Next →</button>';
+  const pager = total > 1
+    ? '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;">'
+      + (wHomePage > 0 ? prevBtn : '<span></span>')
+      + '<span style="font-size:12px;color:var(--muted);">第 '+(wHomePage+1)+' / '+total+' 页 · Page '+(wHomePage+1)+' of '+total+'</span>'
+      + (wHomePage < total - 1 ? nextBtn : '<span></span>')
+      + '</div>'
+    : '';
   document.getElementById('writing-content').innerHTML=`
     <div style="font-size:13px;color:var(--muted);margin-bottom:14px;text-align:center;">选择一个字开始练习 · Pick a character to practice</div>
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px;">
-      ${WRITING_CHARS.map((w,i)=>`
-        <div onclick="startWritingChar(${i})"
+      ${pageChars.map((w,i)=>{ const gi = start + i; return `
+        <div onclick="startWritingChar(${gi})"
           style="background:white;border:2px solid var(--border);border-radius:14px;padding:14px 6px;text-align:center;cursor:pointer;transition:all 0.15s;"
           onmouseover="this.style.borderColor='var(--gold)';this.style.transform='translateY(-2px)'"
           onmouseout="this.style.borderColor='var(--border)';this.style.transform=''">
           <div style="font-family:'Noto Serif SC',serif;font-size:32px;color:var(--ink);">${w.char}</div>
           <div style="font-size:11px;color:var(--muted);margin-top:4px;">${w.pinyin}</div>
           <div style="font-size:10px;color:var(--blue);margin-top:2px;">${w.strokes}笔</div>
-        </div>`).join('')}
+        </div>`;}).join('')}
     </div>
+    ${pager}
     <div style="background:var(--gold-light);border:1px solid var(--gold);border-radius:var(--radius);padding:12px 16px;font-size:12px;color:#5d4037;line-height:1.9;">
       <strong>练习方法 · How to practice</strong><br>
       1️⃣ 左边看笔顺动画，记住每一笔的方向 · Watch the stroke-order animation<br>
@@ -6918,36 +6943,38 @@ function deleteStudent(key){
 
 // ── Manage Classes Modal ──
 let mcmStudentKey='';
-let mcmOriginalClasses=[];   // 打开弹窗时的班级快照，供「取消」回滚
 
 function openManageClasses(key, name){
   mcmStudentKey=key;
-  // 快照打开前的班级（增删即时生效，「取消」据此回滚到打开前的状态）
-  try{ const _u=loadUsers()[key]; mcmOriginalClasses = _u ? getStudentClasses(_u).slice() : []; }
-  catch(e){ mcmOriginalClasses=[]; }
   document.getElementById('mcm-title').textContent='管理班级 · '+name;
-  document.getElementById('mcm-sub').textContent='可添加多个班级，学生作业显示所有班级的作业';
-  document.getElementById('mcm-add-input').value='';
-  document.getElementById('mcm-err').textContent='';
+  document.getElementById('mcm-sub').textContent='点列表里的班级即时加入，点 × 即时移除（都会立即保存）· Tap to add, × to remove — saved instantly';
+  const inp=document.getElementById('mcm-add-input');
+  if(inp) inp.value='';
   renderMCMClasses();
   mcmRenderClassGrid('');   // 列表初始显示全部班级
   document.getElementById('manage-classes-modal').style.display='flex';
 }
 
-// 「或从列表选择」班级列表渲染 + 实时筛选（纯前端在 ALL_CLASSES 里按班级码包含匹配，不分大小写）
-// filter 为空 → 显示全部；无匹配 → 友好提示。不影响「+ 添加」按钮。
+// 当前搜索框的值（增删后重渲染列表时保持筛选）
+function _mcmFilter(){ const i=document.getElementById('mcm-add-input'); return i ? i.value : ''; }
+
+// 班级列表渲染 + 实时筛选（纯前端按班级码包含匹配，不分大小写）。
+// 已在该学生班级里的标记为已选(✓)；点列表里任一班即时加入，点已选项不会重复添加。
 function mcmRenderClassGrid(filter){
   const grid = document.getElementById('mcm-class-grid');
   if(!grid) return;
   const q = (filter||'').trim().toUpperCase();
   const list = q ? ALL_CLASSES.filter(c => String(c).toUpperCase().includes(q)) : ALL_CLASSES;
+  let currentSet = new Set();
+  try{ const u=loadUsers()[mcmStudentKey]; if(u) currentSet = new Set(getStudentClasses(u).map(c=>String(c).toUpperCase())); }catch(e){}
   if(!list.length){
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px;padding:10px 0;">没有匹配的班级 · No matching class</div>';
     return;
   }
-  grid.innerHTML = list.map(c=>`
-    <div class="assign-cls-tile" onclick="mcmQuickAdd('${c}')" title="${c}">${c}</div>
-  `).join('');
+  grid.innerHTML = list.map(c=>{
+    const added = currentSet.has(String(c).toUpperCase());
+    return '<div class="assign-cls-tile'+(added?' selected-tile':'')+'" onclick="mcmQuickAdd(\''+c+'\')" title="'+(added?'已在班级 · Already added':c)+'">'+c+(added?' ✓':'')+'</div>';
+  }).join('');
 }
 
 function renderMCMClasses(){
@@ -6967,28 +6994,27 @@ function renderMCMClasses(){
     </div>`).join('');
 }
 
+// 点列表里的班级 → 即时加入并保存（已在班级则忽略，不报错）
 function mcmAddClass(cls){
-  const input=document.getElementById('mcm-add-input');
-  const c=(cls||input.value||'').trim().toUpperCase();
-  const err=document.getElementById('mcm-err');
-  if(!c){err.textContent='请输入班级编号';return;}
+  const c=(cls||'').trim().toUpperCase();
+  if(!c) return;
   const users=loadUsers();
   const u=users[mcmStudentKey];
-  if(!u){err.textContent='学生不存在';return;}
+  if(!u) return;
   const classes=getStudentClasses(u);
-  if(classes.includes(c)){err.textContent=`已在 ${c} 班级中`;return;}
+  if(classes.includes(c)) return;   // 已在班级，忽略（点已选项不重复添加）
   classes.push(c);
   u.classes=classes;
   u.classCode=classes[0]; // primary class = first
   saveUsers(users);
-  err.textContent='';
-  input.value='';
   renderMCMClasses();
+  mcmRenderClassGrid(_mcmFilter());   // 保持当前筛选并刷新"已添加"标记
   renderAdminStudents();
 }
 
 function mcmQuickAdd(c){ mcmAddClass(c); }
 
+// 点 × → 即时移除并保存
 function mcmRemoveClass(cls){
   const users=loadUsers();
   const u=users[mcmStudentKey];
@@ -6998,22 +7024,8 @@ function mcmRemoveClass(cls){
   u.classCode=classes[0]||'';
   saveUsers(users);
   renderMCMClasses();
+  mcmRenderClassGrid(_mcmFilter());   // 同步刷新列表"已添加"标记
   renderAdminStudents();
-}
-
-// 「取消」：回滚到打开弹窗前的班级快照（放弃本次所有增删），然后关闭弹窗。
-// 走 saveUsers 写回——若云端写入失败，cloudWriteRef 会触发 notifyCloudWriteFailed（不静默）。
-function mcmCancelChanges(){
-  const users=loadUsers();
-  const u=users[mcmStudentKey];
-  if(u){
-    const restored=(mcmOriginalClasses||[]).slice();
-    u.classes=restored;
-    u.classCode=restored[0]||'';
-    saveUsers(users);
-    if(typeof renderAdminStudents==='function') renderAdminStudents();
-  }
-  closeAdminModal('manage-classes-modal');
 }
 
 // ── Class Management ──
@@ -8287,15 +8299,15 @@ function switchTeacherTab(tab){
 
 function renderTeacherDashboard(){
   document.getElementById('teacher-user-bar').innerHTML=
-    '<div style="background:white;border:1px solid var(--border);border-radius:20px;padding:16px 22px;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+    '<div class="tdash-bar" style="background:white;border:1px solid var(--border);border-radius:20px;padding:16px 22px;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:space-between;gap:12px;">'
     + '<div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">'
     + '  <div style="width:46px;height:46px;border-radius:50%;background:var(--blue-light);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">👩‍🏫</div>'
     + '  <div style="flex:1;min-width:0;">'
-    + '    <div style="font-size:18px;font-weight:500;color:var(--ink);font-family:serif;">'+currentTeacher.name+'</div>'
+    + '    <div class="tdash-name" style="font-size:18px;font-weight:500;color:var(--ink);font-family:serif;">'+currentTeacher.name+'</div>'
     + '    <div style="font-size:11px;color:var(--muted);margin-top:2px;">教师 · Teacher · '+(currentTeacher.classes||[]).length+' 个班级</div>'
     + '  </div>'
     + '</div>'
-    + '<div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;">'
+    + '<div class="tdash-actions" style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;">'
     + '  <button class="user-bar-btn" onclick="openChangePassword()" style="padding:6px 12px;font-size:12px;">🔒 密码</button>'
     + '  <button class="user-bar-btn" onclick="switchTeacherAccount()" style="padding:6px 12px;font-size:12px;">🔄 切换账号 · Switch account</button>'
     + '  <button class="user-bar-btn" onclick="doTeacherLogout()" style="padding:6px 12px;font-size:12px;">退出</button>'

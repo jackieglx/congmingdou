@@ -759,6 +759,13 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   .user-bar{flex-wrap:wrap;row-gap:8px;}
   .user-bar-info{min-width:0;}
   .user-bar-actions{margin-left:auto;}
+  /* 窄屏：老师后台头部改为上下堆叠——老师名/身份占整行不被挤成竖排；按钮组落到下一行整组换行，不溢出不被切 */
+  .tdash-bar{flex-direction:column!important;align-items:stretch!important;padding:14px 16px!important;}
+  .tdash-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tdash-actions{justify-content:flex-start!important;}
+  .tdash-actions .user-bar-btn{padding:6px 10px;font-size:11px;}
+  /* 窄屏：四个功能标签由一排 4 列改为 2×2，四个都完整可见可点 */
+  .teacher-tab-grid{grid-template-columns:repeat(2,1fr)!important;}
 }
 
 .recent-acct-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--paper2);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all 0.15s;margin-bottom:8px;}

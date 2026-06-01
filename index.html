@@ -921,7 +921,7 @@
   <div id="teacher-user-bar"></div>
 
   <!-- ── 底部导航 TAB (色块式 chips) ── -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px;">
+  <div class="teacher-tab-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px;">
     <button id="ttab-classes"  onclick="switchTeacherTab('classes')" class="teacher-chip-tab"
       style="padding:14px 4px;border-radius:14px;border:2px solid var(--border);background:white;cursor:pointer;font-family:DM Sans,sans-serif;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:4px;">
       <span style="font-size:22px;">🏫</span>
@@ -1421,13 +1421,9 @@
     <div style="font-size:13px;color:var(--muted);margin-bottom:16px;" id="mcm-sub"></div>
     <div class="section-label" style="margin-bottom:8px;">当前班级 · Current Classes</div>
     <div id="mcm-current-classes" style="margin-bottom:16px;"></div>
-    <div class="section-label" style="margin-bottom:8px;">添加班级 · Add to Class</div>
-    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:stretch;">
-      <input class="auth-input" id="mcm-add-input" placeholder="输入班级编号 e.g. Z2" style="flex:1;min-width:0;" oninput="mcmRenderClassGrid(this.value)"/>
-      <button class="auth-btn" style="background:var(--blue);flex:0 0 auto;width:auto;padding:11px 16px;white-space:nowrap;" onclick="mcmAddClass()">+ 添加</button>
-    </div>
-    <div class="auth-err" id="mcm-err" style="margin-bottom:8px;"></div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">或从列表选择 · Or pick from list</div>
+    <div class="section-label" style="margin-bottom:8px;">添加班级 · Add a Class</div>
+    <input class="auth-input" id="mcm-add-input" placeholder="搜索班级码 · Search e.g. Z3" style="width:100%;margin-bottom:8px;" oninput="mcmRenderClassGrid(this.value)"/>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">点一个班级即可加入（即时保存）· Tap a class to add (saved instantly)</div>
     <style>
       /* 作用域仅限本弹窗：补回班级小方块基础样式（全局 .assign-cls-tile 基础规则缺失/损坏），让列表整齐、首行不贴边被切 */
       #manage-classes-modal #mcm-class-grid .assign-cls-tile{
@@ -1437,10 +1433,7 @@
       }
     </style>
     <div id="mcm-class-grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;max-height:200px;overflow-y:auto;margin-bottom:16px;padding:8px;border:1px solid var(--border);border-radius:10px;"></div>
-    <div style="display:flex;gap:8px;">
-      <button class="auth-btn" style="flex:1;background:var(--paper2);color:var(--ink);" onclick="mcmCancelChanges()">取消 · Cancel</button>
-      <button class="auth-btn" style="flex:1;background:var(--blue);" onclick="closeAdminModal('manage-classes-modal')">完成 · Done</button>
-    </div>
+    <button class="auth-btn" style="width:100%;background:var(--blue);" onclick="closeAdminModal('manage-classes-modal')">关闭 · Close</button>
   </div>
 </div>
 
