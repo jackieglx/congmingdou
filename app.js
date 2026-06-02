@@ -4538,14 +4538,14 @@ let tcCheckClass = '';
 
 function tcCheckClassFromBtn(btn) {
   tcCheckClass = btn.dataset.cls;
-  switchTeacherTab('homework');
-  switchTeacherHWTab('check');
-  renderTeacherCheckPanel();
+  window._tcCheckTask = null;          // 回第一层任务列表
+  switchTeacherTab('students');        // 顶部「检查任务」标签（会调 renderTeacherCheckPanel）
 }
 // 切换批改表的班级筛选：班级码纯字母数字，按钮用单引号传入（不再在 onclick 里塞 JSON.stringify）；
 // 点击后重渲染整个面板，刷新「选中高亮」+ 表格内容。
 function tcSetCheckClass(cls) {
   tcCheckClass = cls;
+  window._tcCheckTask = null;          // 换班级回到第一层任务列表
   renderTeacherCheckPanel();
 }
 
@@ -4567,17 +4567,18 @@ function renderTeacherCheckPanel() {
 }
 
 // 检查界面 · 类型筛选（全部 / 课后作业 / 识字测验），默认 'all'
-function tcSetCheckType(t){ window._tcCheckType = t; renderTeacherCheckTable(); }
+function tcSetCheckType(t){ window._tcCheckType = t; window._tcCheckTask = null; renderTeacherCheckTable(); }
 
+// 两层结构：第一层=任务列表（可点）；第二层=单个任务的完成情况（window._tcCheckTask = 选中任务的 lessonId）
 function renderTeacherCheckTable() {
   const el = document.getElementById('tp-check-content');
   if(!el || !tcCheckClass) return;
   const cls = tcCheckClass;
+  const classFilterEl = document.getElementById('tp-check-class-filter');
 
-  // Refresh filter button styles
-  const filterEl = document.getElementById('tp-check-class-filter');
-  if(filterEl) {
-    filterEl.querySelectorAll('button').forEach(btn => {
+  // Refresh class filter button styles
+  if(classFilterEl) {
+    classFilterEl.querySelectorAll('button').forEach(btn => {
       const isCls = btn.textContent.trim() === cls;
       btn.style.background   = isCls ? 'var(--blue)' : 'white';
       btn.style.color        = isCls ? 'white' : 'var(--muted)';
@@ -4588,71 +4589,32 @@ function renderTeacherCheckTable() {
   const users = loadUsers();
   const members = Object.entries(users).filter(([k,u]) => getStudentClasses(u).includes(cls));
   const allHW   = getAssignedHW().filter(a => a.classCode === cls);
+  // 作业 / 识字测验 区分：识字测验 lessonId 以 '__exam__:' 开头
+  const isExam = a => !!(a && a.lessonId && a.lessonId.indexOf('__exam__:') === 0);
 
+  // ===== 第二层 · 任务详情 =====
+  const sel = window._tcCheckTask ? allHW.find(a => a.lessonId === window._tcCheckTask) : null;
+  if(sel){
+    if(classFilterEl) classFilterEl.style.display = 'none';   // 详情层隐藏班级筛选
+    el.innerHTML = '<button onclick="tcBackToCheckList()" class="btn-home" style="margin-bottom:14px;">← 返回任务列表 · Back</button>'
+      + tcRenderTaskCard(sel, cls, members, isExam);
+    return;
+  }
+  window._tcCheckTask = null;                                  // 选中任务不存在（如切了班）→ 回列表
+  if(classFilterEl) classFilterEl.style.display = 'flex';      // 列表层显示班级筛选
+
+  // ===== 第一层 · 任务列表 =====
   if(!allHW.length) {
     el.innerHTML = '<div class="empty-review" style="text-align:center;padding:40px 0;">该班暂无布置的作业</div>';
     return;
   }
-
-  // 作业 / 识字测验 区分：识字测验 lessonId 以 '__exam__:' 开头
-  const isExam = a => !!(a && a.lessonId && a.lessonId.indexOf('__exam__:') === 0);
-  // 类型筛选状态（默认 'all' 全部，不影响完成度数据/计算，只控制显示哪些项）
+  // 类型筛选（默认 'all'，不影响完成度数据/计算，只控制显示哪些项）
   const type = window._tcCheckType || 'all';
   const typeMatch = a => type === 'all' ? true : (type === 'exam' ? isExam(a) : !isExam(a));
   const activeHW  = allHW.filter(a => !isHWExpired(a) && typeMatch(a));
   const expiredHW = allHW.filter(a =>  isHWExpired(a) && typeMatch(a));
 
-  function hwSection(hwList, title, color) {
-    if(!hwList.length) return '';
-    return '<div style="font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:' + color + ';margin:16px 0 10px;">' + title + '</div>'
-      + hwList.map(a => {
-          const completions = getHWCompletions(a.lessonId, cls);
-          const done = completions.length;
-          const total = members.length;
-          const pct = total > 0 ? Math.round(done/total*100) : 0;
-          const barColor = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
-          const doneNames = completions.map(c => c.username);
-          const notDone = members.filter(([k,u]) => !doneNames.includes(u.username||u.name));
-          return '<div style="background:white;border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">'
-            + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-            + '<div>'
-            + '<div style="font-size:15px;font-weight:600;color:var(--ink);">' + (isExam(a)?'📝 ':'📚 ') + '《' + a.lessonTitle + '》</div>'
-            + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + a.date + (a.deadlineLabel ? ' · ' + a.deadlineLabel : '') + '</div>'
-            + '</div>'
-            + '<div style="text-align:right;">'
-            + '<div style="font-size:24px;font-weight:700;color:' + barColor + ';">' + done + '/' + total + '</div>'
-            + '<div style="font-size:11px;color:' + barColor + ';">' + pct + '% 完成</div>'
-            + '</div></div>'
-            + '<div style="height:6px;background:var(--paper3);border-radius:4px;margin-bottom:12px;overflow:hidden;">'
-            + '<div style="width:' + pct + '%;height:100%;background:' + barColor + ';border-radius:4px;"></div></div>'
-            + '<div style="display:flex;gap:12px;">'
-            // Done column
-            + '<div style="flex:1;">'
-            + '<div style="font-size:11px;font-weight:600;color:#166534;margin-bottom:5px;">✅ 已完成 (' + done + ')</div>'
-            + (done > 0
-                ? completions.map(c =>
-                    '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;background:#f0fdf4;border-radius:6px;margin-bottom:3px;">'
-                    + '<span style="font-size:12px;color:#166534;">' + (c.name||c.username) + '</span>'
-                    + '<span style="font-size:11px;font-weight:600;color:#16a34a;">' + c.pct + '%</span>'
-                    + '</div>'
-                  ).join('')
-                : '<div style="font-size:12px;color:var(--muted);font-style:italic;">暂无</div>')
-            + '</div>'
-            // Not done column
-            + '<div style="flex:1;">'
-            + '<div style="font-size:11px;font-weight:600;color:#991b1b;margin-bottom:5px;">⏳ 未完成 (' + notDone.length + ')</div>'
-            + (notDone.length > 0
-                ? notDone.map(([k,u]) =>
-                    '<div style="padding:4px 8px;background:#fef2f2;border-radius:6px;margin-bottom:3px;">'
-                    + '<span style="font-size:12px;color:#991b1b;">' + (u.name||u.username) + '</span>'
-                    + '</div>'
-                  ).join('')
-                : '<div style="font-size:12px;color:#166534;font-weight:600;">🎉 全班完成！</div>')
-            + '</div></div></div>';
-        }).join('');
-  }
-
-  // 类型筛选标签（风格同班级标签药丸；选中态高亮；中英双语；窄屏 flex-wrap 自动换行）
+  // 类型筛选标签（风格同班级标签药丸；中英双语；窄屏 flex-wrap 自动换行）
   const typePill = (val, label) => {
     const active = type === val;
     return '<button onclick="tcSetCheckType(\''+val+'\')" '
@@ -4666,11 +4628,77 @@ function renderTeacherCheckTable() {
     + typePill('exam','📝 识字测验 · Character Test')
     + '</div>';
 
-  const sectionsHtml = hwSection(activeHW, '进行中 · Active', 'var(--blue)')
-                     + hwSection(expiredHW, '已过期 · Expired', 'var(--muted)');
+  // 任务列表：每行一个任务（名 + 📚/📝 + 完成度小计），整行可点 → 进第二层详情
+  const listSection = (hwList, title, color) => {
+    if(!hwList.length) return '';
+    return '<div style="font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:' + color + ';margin:16px 0 10px;">' + title + '</div>'
+      + hwList.map(a => {
+          const done = getHWCompletions(a.lessonId, cls).length;
+          const total = members.length;
+          const safeId = (a.lessonId||'').replace(/'/g, "\\'");
+          return '<div onclick="tcOpenCheckTask(\''+safeId+'\')" style="background:white;border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;" onmouseover="this.style.borderColor=\'var(--blue)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
+            + '<div style="flex:1;min-width:0;">'
+            + '<div style="font-size:15px;font-weight:600;color:var(--ink);">' + (isExam(a)?'📝 ':'📚 ') + '《' + a.lessonTitle + '》</div>'
+            + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + a.date + (a.deadlineLabel ? ' · ' + a.deadlineLabel : '') + '</div>'
+            + '</div>'
+            + '<div style="text-align:right;flex-shrink:0;"><div style="font-size:16px;font-weight:700;color:var(--ink);">' + done + '/' + total + '</div><div style="font-size:11px;color:var(--muted);">完成 ›</div></div>'
+            + '</div>';
+        }).join('');
+  };
+  const sectionsHtml = listSection(activeHW, '进行中 · Active', 'var(--blue)')
+                     + listSection(expiredHW, '已过期 · Expired', 'var(--muted)');
   el.innerHTML = typeBar + (sectionsHtml
     || '<div class="empty-review" style="text-align:center;padding:30px 0;color:var(--muted);">该类暂无 · None in this filter</div>');
 }
+
+// 第二层复用：渲染单个任务的完成情况卡（done/total + 进度条 + 已完成名单带 pct% + 未完成名单）
+// —— 与原「检查任务完成情况」卡身逻辑一致，数据来自 getHWCompletions，未改动
+function tcRenderTaskCard(a, cls, members, isExam){
+  const completions = getHWCompletions(a.lessonId, cls);
+  const done = completions.length;
+  const total = members.length;
+  const pct = total > 0 ? Math.round(done/total*100) : 0;
+  const barColor = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
+  const doneNames = completions.map(c => c.username);
+  const notDone = members.filter(([k,u]) => !doneNames.includes(u.username||u.name));
+  return '<div style="background:white;border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+    + '<div>'
+    + '<div style="font-size:15px;font-weight:600;color:var(--ink);">' + (isExam(a)?'📝 ':'📚 ') + '《' + a.lessonTitle + '》</div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + a.date + (a.deadlineLabel ? ' · ' + a.deadlineLabel : '') + '</div>'
+    + '</div>'
+    + '<div style="text-align:right;">'
+    + '<div style="font-size:24px;font-weight:700;color:' + barColor + ';">' + done + '/' + total + '</div>'
+    + '<div style="font-size:11px;color:' + barColor + ';">' + pct + '% 完成</div>'
+    + '</div></div>'
+    + '<div style="height:6px;background:var(--paper3);border-radius:4px;margin-bottom:12px;overflow:hidden;">'
+    + '<div style="width:' + pct + '%;height:100%;background:' + barColor + ';border-radius:4px;"></div></div>'
+    + '<div style="display:flex;gap:12px;">'
+    + '<div style="flex:1;">'
+    + '<div style="font-size:11px;font-weight:600;color:#166534;margin-bottom:5px;">✅ 已完成 (' + done + ')</div>'
+    + (done > 0
+        ? completions.map(c =>
+            '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;background:#f0fdf4;border-radius:6px;margin-bottom:3px;">'
+            + '<span style="font-size:12px;color:#166534;">' + (c.name||c.username) + '</span>'
+            + '<span style="font-size:11px;font-weight:600;color:#16a34a;">' + c.pct + '%</span>'
+            + '</div>'
+          ).join('')
+        : '<div style="font-size:12px;color:var(--muted);font-style:italic;">暂无</div>')
+    + '</div>'
+    + '<div style="flex:1;">'
+    + '<div style="font-size:11px;font-weight:600;color:#991b1b;margin-bottom:5px;">⏳ 未完成 (' + notDone.length + ')</div>'
+    + (notDone.length > 0
+        ? notDone.map(([k,u]) =>
+            '<div style="padding:4px 8px;background:#fef2f2;border-radius:6px;margin-bottom:3px;">'
+            + '<span style="font-size:12px;color:#991b1b;">' + (u.name||u.username) + '</span>'
+            + '</div>'
+          ).join('')
+        : '<div style="font-size:12px;color:#166534;font-weight:600;">🎉 全班完成！</div>')
+    + '</div></div></div>';
+}
+
+function tcOpenCheckTask(lessonId){ window._tcCheckTask = lessonId; renderTeacherCheckTable(); }
+function tcBackToCheckList(){ window._tcCheckTask = null; renderTeacherCheckTable(); }
 
 // ── Homework completion tracking ──
 function getHWCompletions(lessonId, classCode) {
@@ -8319,6 +8347,10 @@ function switchTeacherTab(tab){
     renderTeacherClassCards();
   } else if(tab==='redeem'){
     renderTeacherRedeemRequests();
+  } else if(tab==='students'){
+    // 「检查任务」标签（原"学生"标签位置）：进入即回到第一层任务列表
+    window._tcCheckTask = null;
+    renderTeacherCheckPanel();
   }
 }
 

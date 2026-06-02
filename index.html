@@ -936,9 +936,9 @@
     </button>
     <button id="ttab-students" onclick="switchTeacherTab('students')" class="teacher-chip-tab"
       style="padding:14px 4px;border-radius:14px;border:2px solid var(--border);background:white;cursor:pointer;font-family:DM Sans,sans-serif;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:4px;">
-      <span style="font-size:22px;">👤</span>
-      <span style="font-size:13px;font-weight:700;color:var(--ink);line-height:1.2;">学生</span>
-      <span style="font-size:10px;color:var(--muted);">Students</span>
+      <span style="font-size:22px;">✅</span>
+      <span style="font-size:13px;font-weight:700;color:var(--ink);line-height:1.2;">检查任务</span>
+      <span style="font-size:10px;color:var(--muted);">Check Tasks</span>
     </button>
     <button id="ttab-redeem"   onclick="switchTeacherTab('redeem')" class="teacher-chip-tab"
       style="padding:14px 4px;border-radius:14px;border:2px solid var(--border);background:white;cursor:pointer;font-family:DM Sans,sans-serif;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:4px;">
@@ -970,18 +970,9 @@
        布置作业 + 检查任务（学生完成情况）
   ══════════════════════════════ -->
   <div id="tpanel-homework" style="display:none;">
-    <!-- 顶部：检查任务大色块（居中，浅蓝） -->
-    <div style="margin-bottom:20px;">
-      <button id="thwtab-check" onclick="switchTeacherHWTab('check')"
-        style="width:100%;padding:24px;border-radius:18px;border:2.5px solid #60a5fa;background:linear-gradient(135deg,#eff6ff,#dbeafe);color:#1e3a8a;font-size:18px;font-weight:700;font-family:DM Sans,sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(96,165,250,0.18);transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:12px;"
-        onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 18px rgba(96,165,250,0.28)'"
-        onmouseout="this.style.transform='';this.style.boxShadow='0 4px 12px rgba(96,165,250,0.18)'">
-        <span style="font-size:30px;">✅</span>
-        <span>检查任务完成情况 · Check Assignments</span>
-      </button>
-      <!-- 隐藏的 assign 子 tab 按钮（保留兼容） -->
-      <button id="thwtab-assign" onclick="switchTeacherHWTab('assign')" style="display:none;"></button>
-    </div>
+    <!-- 「检查任务」入口已移到顶部标签（原"学生"位置）；此处直接显示布置作业 -->
+    <!-- 隐藏的 assign 子 tab 按钮（switchTeacherHWTab 兼容引用，保留） -->
+    <button id="thwtab-assign" onclick="switchTeacherHWTab('assign')" style="display:none;"></button>
 
     <!-- 布置作业 sub-panel -->
     <div id="thwpanel-assign">
@@ -1027,24 +1018,15 @@
       </div>
       <div id="teacher-lesson-list" style="margin-bottom:20px;"></div>
     </div>
-
-    <!-- 检查任务 sub-panel -->
-    <div id="thwpanel-check" style="display:none;">
-      <!-- 返回任务中心（复用班级管理返回按钮的黑色 btn-home 样式）-->
-      <button onclick="switchTeacherHWTab('assign')" class="btn-home" style="margin-bottom:14px;">← 返回任务中心 · Back</button>
-      <!-- 班级筛选 -->
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;" id="tp-check-class-filter"></div>
-      <!-- 作业完成情况表格 -->
-      <div id="tp-check-content"></div>
-    </div>
   </div>
 
   <!-- ══════════════════════════════
        查找学生 PANEL
   ══════════════════════════════ -->
   <div id="tpanel-students" style="display:none;">
-    <input class="auth-input" id="student-search-input" placeholder="🔍 输入学生姓名 · Search student" style="margin-bottom:12px;" oninput="filterStudentSearch()"/>
-    <div id="student-search-results"></div>
+    <!-- 检查任务：第一层=任务列表，点任务进第二层完成情况；班级筛选 + 内容容器复用原检查逻辑 -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;" id="tp-check-class-filter"></div>
+    <div id="tp-check-content"></div>
   </div>
 
   <!-- ══════════════════════════════
