@@ -630,6 +630,10 @@ async function loadSharedCloudCaches(){
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+id).classList.add('active');
+  // 老师后台用更宽的居中容器 + 两侧留白（其它端不加，保持默认 720）。
+  // 用 JS 切 class（不依赖 :has），保证可靠生效。
+  const appEl = document.querySelector('.app');
+  if(appEl) appEl.classList.toggle('app-wide', id === 'teacher');
   window.scrollTo(0,0);
   // When showing auth screen, check for recent accounts
   if(id === 'auth'){
@@ -3064,6 +3068,220 @@ function wpShowResult(){
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
         <button class="auth-btn" onclick="startWordPicGame()" style="display:inline-block;width:auto;padding:10px 24px;">🔄 再玩一次 · Play again</button>
         <button class="auth-btn" onclick="exitWordPicGame()" style="display:inline-block;width:auto;padding:10px 24px;background:var(--paper2);color:var(--ink);">← 返回 · Back</button>
+      </div>
+    </div>
+  `;
+}
+
+// ════════════════════════════════════════
+// 中英大挑战 · CHINESE ↔ ENGLISH MATCH GAME
+// ════════════════════════════════════════
+// 题库 MATCH_WORDS 在 data.js（{zh, en, level}）。easy=看中文选英文；hard=看英文选中文。
+// 本版只用本局临时分，不接全局积分（参照看字选图）。
+const MA_ROUND_SIZE = 8;    // 每局题数
+const MA_MAX_WRONG  = 3;    // 单题最多点错几次（用尽则公布答案）
+
+let maQuestions = [];
+let maIdx = 0;
+let maScore = 0;
+let maWrong = 0;
+let maAnswered = false;
+let maCorrectIdx = -1;
+let maMode = 'easy';        // 'easy'（看中文选英文）/ 'hard'（看英文选中文）
+
+function startMatchGame(){
+  showScreen('match');
+  renderMatchHome();         // 先让学生选难度
+}
+
+function exitMatchGame(){
+  if(window.speechSynthesis) window.speechSynthesis.cancel();
+  showScreen('module-literacy');
+}
+
+// 朗读（中文 zh-CN / 英文 en-US）
+function maSpeak(text, lang){
+  try{
+    if(!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang || 'zh-CN';
+    window.speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+// 难度选择页
+function renderMatchHome(){
+  const container = document.getElementById('match-container');
+  container.innerHTML = `
+    <div style="text-align:center;padding:8px 0 18px;">
+      <div style="font-family:serif;font-size:22px;color:var(--purple);margin-bottom:4px;">中英大挑战 · Chinese ↔ English 🔤</div>
+      <div style="font-size:13px;color:var(--muted);">选个难度开始 · Pick a difficulty</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div onclick="chooseMatchLevel('easy')" style="background:linear-gradient(135deg,#f3e8fd,#e0c8f5);border:2px solid #ba68c8;border-radius:18px;padding:20px 22px;cursor:pointer;box-shadow:var(--shadow);transition:transform 0.15s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform=''">
+        <div style="font-size:18px;font-weight:700;color:#7b1fa2;">看中文选英文 · 简单 Easy</div>
+        <div style="font-size:13px;color:#8e24aa;margin-top:4px;">看到中文词，选出对应英文<br>See the Chinese word, pick the English</div>
+      </div>
+      <div onclick="chooseMatchLevel('hard')" style="background:linear-gradient(135deg,#ede7f6,#d1c4e9);border:2px solid #9575cd;border-radius:18px;padding:20px 22px;cursor:pointer;box-shadow:var(--shadow);transition:transform 0.15s;" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform=''">
+        <div style="font-size:18px;font-weight:700;color:#512da8;">看英文选中文 · 挑战 Hard</div>
+        <div style="font-size:13px;color:#5e35b1;margin-top:4px;">看到英文词，选出对应中文<br>See the English word, pick the Chinese</div>
+      </div>
+    </div>`;
+}
+
+function chooseMatchLevel(mode){
+  maMode = (mode === 'hard') ? 'hard' : 'easy';
+  const pool = MATCH_WORDS.filter(w => w.level === maMode);
+  maQuestions = shuffle([...pool]).slice(0, Math.min(MA_ROUND_SIZE, pool.length));
+  maIdx = 0;
+  maScore = 0;
+  renderMatchQuestion();
+}
+
+function renderMatchQuestion(){
+  const q = maQuestions[maIdx];
+  maAnswered = false;
+  maWrong = 0;
+
+  // 题面 / 选项方向：easy 显示中文、选项是英文；hard 显示英文、选项是中文
+  const promptText = maMode === 'easy' ? q.zh : q.en;
+  const promptLang = maMode === 'easy' ? 'zh-CN' : 'en-US';
+  const answerOf = w => maMode === 'easy' ? w.en : w.zh;   // 选项显示的文字
+
+  // 选项 = 1 正确 + 2 干扰（同 level 内取，显示文字不与正确项相同）
+  const correctText = answerOf(q);
+  const used = new Set([correctText]);
+  const distractors = [];
+  for(const cand of shuffle(MATCH_WORDS.filter(w => w.level === maMode && w.zh !== q.zh))){
+    const t = answerOf(cand);
+    if(used.has(t)) continue;
+    used.add(t);
+    distractors.push(cand);
+    if(distractors.length === 2) break;
+  }
+  const options = shuffle([q, ...distractors]);
+  maCorrectIdx = options.findIndex(o => o.zh === q.zh);
+
+  const container = document.getElementById('match-container');
+  container.innerHTML = `
+    <style>
+      .ma-title { font-family:serif; font-size:18px; color:var(--purple); }
+      .ma-qnum  { font-size:11px; color:var(--muted); }
+      .ma-score { font-size:20px; font-weight:700; color:var(--purple); }
+      .ma-prompt{ font-family:'Noto Serif SC',serif; font-size:40px; font-weight:700; color:#6a1b9a; line-height:1.15; word-break:break-word; }
+      @media(max-width:560px){
+        .ma-title { font-size:15px; }
+        .ma-qnum  { font-size:10px; }
+        .ma-score { font-size:16px; }
+        .ma-prompt{ font-size:32px; }
+      }
+    </style>
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;">
+      <div>
+        <div class="ma-title">中英大挑战 · Chinese ↔ English 🔤</div>
+        <div class="ma-qnum">第 ${maIdx+1} / ${maQuestions.length} 题 · Question ${maIdx+1} / ${maQuestions.length} · ${maMode==='easy'?'简单 Easy':'挑战 Hard'}</div>
+      </div>
+      <div style="background:var(--purple-light);border:2px solid var(--purple);border-radius:16px;padding:6px 14px;text-align:center;flex-shrink:0;">
+        <div class="ma-score">${maScore} 分 · pts</div>
+      </div>
+    </div>
+
+    <!-- 题面 -->
+    <div style="background:linear-gradient(135deg,#f3e8fd,#e0c8f5);border:2px solid #ba68c8;border-radius:20px;padding:24px 16px;margin-bottom:8px;text-align:center;">
+      <div style="font-size:12px;color:#8e24aa;margin-bottom:10px;font-weight:500;">${maMode==='easy'?'这个中文词的英文是？<br><span style="font-size:10px;">Which English matches this word?</span>':'这个英文词的中文是？<br><span style="font-size:10px;">Which Chinese matches this word?</span>'}</div>
+      <div class="ma-prompt">${promptText}</div>
+      <button onclick="maSpeak('${promptText.replace(/'/g,"\\'")}','${promptLang}')" style="margin-top:12px;background:var(--purple);color:white;border:none;border-radius:20px;padding:7px 18px;font-size:13px;cursor:pointer;font-family:DM Sans,sans-serif;">🔊 听一听 · Listen</button>
+    </div>
+
+    <!-- 提示行 -->
+    <div id="ma-hint" style="text-align:center;font-size:12px;color:var(--muted);min-height:18px;margin-bottom:12px;">选出正确答案 · Pick the correct answer</div>
+
+    <!-- 选项（竖排，文字按钮） -->
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+      ${options.map((o, idx)=>`
+        <div class="ma-option" id="ma-opt-${idx}" onclick="maPick(${idx})"
+          style="background:white;border:2.5px solid #ce93d8;border-radius:14px;padding:14px 16px;cursor:pointer;text-align:center;font-size:17px;color:var(--ink);transition:transform 0.15s,border-color 0.15s;box-shadow:var(--shadow);"
+          onmouseover="if(!this.dataset.done)this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">${answerOf(o)}</div>`).join('')}
+    </div>
+
+    <!-- 下一题按钮（答完才出现） -->
+    <div id="ma-next-wrap" style="text-align:center;display:none;">
+      <button onclick="maNext()" class="auth-btn" style="display:inline-block;width:auto;padding:10px 28px;">下一题 · Next →</button>
+    </div>
+  `;
+}
+
+function maPick(idx){
+  if(maAnswered) return;
+  const opt = document.getElementById('ma-opt-'+idx);
+  if(!opt) return;
+  const hint = document.getElementById('ma-hint');
+  const q = maQuestions[maIdx];
+  const correctText = maMode === 'easy' ? q.en : q.zh;
+
+  if(idx === maCorrectIdx){
+    // 点对 → +1 分、标记正确、禁用本题、显示下一题
+    maAnswered = true;
+    opt.dataset.done = '1';
+    opt.style.borderColor = 'var(--green)';
+    opt.style.background = 'var(--green-light)';
+    maScore += 1;
+    if(typeof playCorrect==='function') playCorrect();
+    if(hint){ hint.textContent = '答对了！ +1 分 · Correct! +1 🎉'; hint.style.color = 'var(--green)'; }
+    maShowNext();
+  } else {
+    // 点错 → 该选项标灰失效，提示还能试几次
+    opt.dataset.done = '1';
+    opt.style.pointerEvents = 'none';
+    opt.style.opacity = '0.4';
+    opt.style.borderColor = 'var(--border)';
+    maWrong++;
+    if(typeof playWrong==='function') playWrong();
+    if(maWrong >= MA_MAX_WRONG){
+      // 点错累计达上限 → 自动高亮正确答案并告诉学生，允许进入下一题
+      maAnswered = true;
+      const correct = document.getElementById('ma-opt-'+maCorrectIdx);
+      if(correct){ correct.style.borderColor = 'var(--green)'; correct.style.background = 'var(--green-light)'; }
+      if(hint){ hint.textContent = '正确答案：' + correctText + ' · Correct answer'; hint.style.color = 'var(--purple)'; }
+      maShowNext();
+    } else {
+      const left = MA_MAX_WRONG - maWrong;
+      if(hint){ hint.textContent = '不对哦，还能试 ' + left + ' 次 · Try again (' + left + ' left)'; hint.style.color = '#c0392b'; }
+    }
+  }
+}
+
+function maShowNext(){
+  const wrap = document.getElementById('ma-next-wrap');
+  if(wrap) wrap.style.display = 'block';
+}
+
+function maNext(){
+  maIdx++;
+  if(maIdx >= maQuestions.length){
+    maShowResult();
+  } else {
+    renderMatchQuestion();
+  }
+}
+
+function maShowResult(){
+  const container = document.getElementById('match-container');
+  const total = maQuestions.length;
+  const pct = total ? Math.round(maScore / total * 100) : 0;
+  container.innerHTML = `
+    <div style="background:white;border:2px solid #ba68c8;border-radius:20px;padding:36px 24px;text-align:center;box-shadow:var(--shadow);margin-top:20px;">
+      <div style="font-size:56px;margin-bottom:12px;">${pct>=80?'🏆':pct>=50?'🎉':'💪'}</div>
+      <div style="font-family:serif;font-size:22px;color:var(--purple);margin-bottom:8px;">本局结束！· All done!</div>
+      <div style="font-size:16px;color:var(--ink);margin-bottom:6px;">答对 <strong>${maScore}</strong> / ${total} 题 · ${maScore}/${total} correct</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:24px;">中英大挑战 · ${maMode==='easy'?'简单 Easy':'挑战 Hard'}</div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <button class="auth-btn" onclick="chooseMatchLevel('${maMode}')" style="display:inline-block;width:auto;padding:10px 24px;">🔄 再玩一次 · Play again</button>
+        <button class="auth-btn" onclick="renderMatchHome()" style="display:inline-block;width:auto;padding:10px 24px;background:var(--paper2);color:var(--ink);">选难度 · Difficulty</button>
+        <button class="auth-btn" onclick="exitMatchGame()" style="display:inline-block;width:auto;padding:10px 24px;background:var(--paper2);color:var(--ink);">← 返回 · Back</button>
       </div>
     </div>
   `;

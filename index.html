@@ -583,6 +583,16 @@
       </div>
     </div>
 
+    <!-- Game 4: Chinese ↔ English -->
+    <div onclick="startMatchGame()" style="background:linear-gradient(135deg,#f3e8fd,#e0c8f5);border:2px solid #ba68c8;border-radius:20px;padding:20px 24px;cursor:pointer;display:flex;align-items:center;gap:20px;transition:all 0.2s;box-shadow:var(--shadow);" onmouseover="this.style.transform='translateY(-3px)'" onmouseout="this.style.transform=''">
+      <div style="font-size:56px;flex-shrink:0;">🔤</div>
+      <div>
+        <div style="font-family:serif;font-size:20px;color:#7b1fa2;margin-bottom:4px;">中英大挑战 · Chinese ↔ English</div>
+        <div style="font-size:13px;color:#8e24aa;">中英文配对，选难度开玩<br>Match Chinese and English words!</div>
+        <div style="margin-top:8px;"><span style="font-size:11px;background:#d6aee6;color:#4a148c;padding:2px 8px;border-radius:10px;font-weight:500;">易/难两档 · 8题 · Easy & Hard</span></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -600,6 +610,12 @@
 <div id="screen-wordpic" class="screen">
   <button class="btn-home" onclick="exitWordPicGame()">← 返回 · Back</button>
   <div id="wordpic-container"></div>
+</div>
+
+<!-- CHINESE ↔ ENGLISH MATCH GAME SCREEN -->
+<div id="screen-match" class="screen">
+  <button class="btn-home" onclick="exitMatchGame()">← 返回 · Back</button>
+  <div id="match-container"></div>
 </div>
 
 <!-- LEARNING VIDEOS SCREEN -->
