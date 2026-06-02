@@ -2249,7 +2249,7 @@ const WORDPIC_BANK = [
   {w:'口',   img:'https://openmoji.org/data/color/svg/1F444.svg'},
   {w:'手',   img:'https://openmoji.org/data/color/svg/270B.svg'},
   {w:'羽毛', img:'https://openmoji.org/data/color/svg/1FAB6.svg'},
-  {w:'鹅',   img:'https://openmoji.org/data/color/svg/1F426.svg'},
+  {w:'鹅',   img:'images/wordpic/goose.png'},
   {w:'夜晚', img:'https://openmoji.org/data/color/svg/1F303.svg'},
   {w:'上',   img:'https://openmoji.org/data/color/svg/2B06.svg'},
   {w:'下',   img:'https://openmoji.org/data/color/svg/2B07.svg'},

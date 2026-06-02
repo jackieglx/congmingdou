@@ -2073,7 +2073,7 @@ function renderWritingPractice(){
 
   document.getElementById('writing-content').innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <button onclick="renderWritingHome()" style="background:var(--paper2);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif;">← 返回</button>
+      <button onclick="renderWritingHome()" style="background:var(--paper2);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif;white-space:nowrap;">← 返回字表 · Back to list</button>
       <div style="text-align:center;">
         <span style="font-family:'Noto Serif SC',serif;font-size:28px;color:var(--ink);">${ch.char}</span>
         <span style="font-size:15px;color:var(--muted);margin-left:8px;">${ch.pinyin}</span>
@@ -4566,6 +4566,9 @@ function renderTeacherCheckPanel() {
   renderTeacherCheckTable();
 }
 
+// 检查界面 · 类型筛选（全部 / 课后作业 / 识字测验），默认 'all'
+function tcSetCheckType(t){ window._tcCheckType = t; renderTeacherCheckTable(); }
+
 function renderTeacherCheckTable() {
   const el = document.getElementById('tp-check-content');
   if(!el || !tcCheckClass) return;
@@ -4585,13 +4588,19 @@ function renderTeacherCheckTable() {
   const users = loadUsers();
   const members = Object.entries(users).filter(([k,u]) => getStudentClasses(u).includes(cls));
   const allHW   = getAssignedHW().filter(a => a.classCode === cls);
-  const activeHW  = allHW.filter(a => !isHWExpired(a));
-  const expiredHW = allHW.filter(a => isHWExpired(a));
 
   if(!allHW.length) {
     el.innerHTML = '<div class="empty-review" style="text-align:center;padding:40px 0;">该班暂无布置的作业</div>';
     return;
   }
+
+  // 作业 / 识字测验 区分：识字测验 lessonId 以 '__exam__:' 开头
+  const isExam = a => !!(a && a.lessonId && a.lessonId.indexOf('__exam__:') === 0);
+  // 类型筛选状态（默认 'all' 全部，不影响完成度数据/计算，只控制显示哪些项）
+  const type = window._tcCheckType || 'all';
+  const typeMatch = a => type === 'all' ? true : (type === 'exam' ? isExam(a) : !isExam(a));
+  const activeHW  = allHW.filter(a => !isHWExpired(a) && typeMatch(a));
+  const expiredHW = allHW.filter(a =>  isHWExpired(a) && typeMatch(a));
 
   function hwSection(hwList, title, color) {
     if(!hwList.length) return '';
@@ -4607,7 +4616,7 @@ function renderTeacherCheckTable() {
           return '<div style="background:white;border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);">'
             + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
             + '<div>'
-            + '<div style="font-size:15px;font-weight:600;color:var(--ink);">《' + a.lessonTitle + '》</div>'
+            + '<div style="font-size:15px;font-weight:600;color:var(--ink);">' + (isExam(a)?'📝 ':'📚 ') + '《' + a.lessonTitle + '》</div>'
             + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + a.date + (a.deadlineLabel ? ' · ' + a.deadlineLabel : '') + '</div>'
             + '</div>'
             + '<div style="text-align:right;">'
@@ -4643,8 +4652,24 @@ function renderTeacherCheckTable() {
         }).join('');
   }
 
-  el.innerHTML = hwSection(activeHW, '进行中 · Active', 'var(--blue)')
-               + hwSection(expiredHW, '已过期 · Expired', 'var(--muted)');
+  // 类型筛选标签（风格同班级标签药丸；选中态高亮；中英双语；窄屏 flex-wrap 自动换行）
+  const typePill = (val, label) => {
+    const active = type === val;
+    return '<button onclick="tcSetCheckType(\''+val+'\')" '
+      + 'style="padding:6px 14px;border-radius:20px;border:2px solid '+(active?'var(--blue)':'var(--border)')+';'
+      + 'background:'+(active?'var(--blue)':'white')+';color:'+(active?'white':'var(--muted)')+';'
+      + 'font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;">'+label+'</button>';
+  };
+  const typeBar = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'
+    + typePill('all','全部 · All')
+    + typePill('homework','📚 课后作业 · Homework')
+    + typePill('exam','📝 识字测验 · Character Test')
+    + '</div>';
+
+  const sectionsHtml = hwSection(activeHW, '进行中 · Active', 'var(--blue)')
+                     + hwSection(expiredHW, '已过期 · Expired', 'var(--muted)');
+  el.innerHTML = typeBar + (sectionsHtml
+    || '<div class="empty-review" style="text-align:center;padding:30px 0;color:var(--muted);">该类暂无 · None in this filter</div>');
 }
 
 // ── Homework completion tracking ──
@@ -11844,8 +11869,40 @@ function examRender(){
   // 移动端 2 列样式
   html += '<style>@media(max-width:560px){#exam-grid{grid-template-columns:repeat(2,1fr)!important;}.exam-tile .ec{font-size:48px!important;}}</style>';
 
+  // ===== DEV TEST ONLY START =====  (临时测试用，上线前整段删除：见文件内 devExamFakeComplete 同名标记)
+  html += '<div style="margin-top:16px;border:2px dashed var(--red);border-radius:12px;padding:10px;text-align:center;background:#fff5f5;">'
+    + '<div style="font-size:11px;color:var(--red);font-weight:700;margin-bottom:6px;">⚡ 测试用 · DEV ONLY · 跳过做题直接写入完成记录（上线前删除）</div>'
+    + '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">'
+    + '<button onclick="devExamFakeComplete(100)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--red);background:white;color:var(--red);font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif;">直接完成 100% (DEV)</button>'
+    + '<button onclick="devExamFakeComplete(80)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--red);background:white;color:var(--red);font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif;">80% (DEV)</button>'
+    + '<button onclick="devExamFakeComplete(60)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--red);background:white;color:var(--red);font-size:12px;cursor:pointer;font-family:DM Sans,sans-serif;">60% (DEV)</button>'
+    + '</div></div>';
+  // ===== DEV TEST ONLY END =====
+
   el.innerHTML = html;
 }
+
+// ===== DEV TEST ONLY START =====  (临时测试用，上线前连同 examRender 里的 DEV 按钮一起删除)
+// 跳过真做题，直接为「当前进行中的测验 + 当前登录学生」写入一条完成记录，
+// 复用真实保存路径 saveHWCompletion，老师端「检查任务完成情况」即可看到该结果。
+function devExamFakeComplete(pct){
+  if(!examState){ alert('⚡DEV: 当前没有进行中的测验'); return; }
+  if(typeof currentUser === 'undefined' || !currentUser){ alert('⚡DEV: 当前没有登录的学生'); return; }
+  const st = examState;
+  const entry = {
+    username: currentUser.username||currentUser.name,
+    name: currentUser.name||currentUser.username,
+    mode: '识字测验',
+    pct: pct,
+    date: new Date().toLocaleDateString('zh-CN'),
+    ts: Date.now(),
+    attempt: 1,
+    _dev: true,            // 标记为测试数据，便于识别
+  };
+  saveHWCompletion('__exam__:'+st.packKey, st.classCode, entry);
+  alert('⚡DEV 已写入完成记录：\n'+entry.name+' · '+st.pack.title+' · '+pct+'%\n班级 '+st.classCode+'\n\n去老师端「检查任务完成情况」查看。');
+}
+// ===== DEV TEST ONLY END =====
 
 function examPlayCurrent(){
   if(!examState) return;
